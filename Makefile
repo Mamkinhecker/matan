@@ -1,4 +1,4 @@
-DATABASE_URL ?= postgres://postgres:postgres@localhost:5432/matan_trainer?sslmode=disable
+DATABASE_URL ?= postgres://postgres:postgres@localhost:5544/matan_trainer?sslmode=disable
 GOCACHE ?= /private/tmp/matan-go-build
 
 .PHONY: run test tidy
