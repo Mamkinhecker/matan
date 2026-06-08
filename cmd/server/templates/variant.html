@@ -1,0 +1,34 @@
+{{define "content"}}
+<div class="page-head">
+	<p class="eyebrow">Письменная работа</p>
+	<h1>Пробный вариант</h1>
+</div>
+<section class="variant">
+	<ol>
+		{{range .Questions}}
+		<li>
+			<div>
+				<span class="tag">{{.TopicTitle}}</span>
+				<p>{{.Text}}</p>
+				<details>
+					<summary>Эталон ответа</summary>
+					<p>{{.ExpectedAnswer}}</p>
+				</details>
+				<form class="grade-row" method="post" action="/attempts">
+					<input type="hidden" name="target_type" value="question">
+					<input type="hidden" name="target_id" value="{{.ID}}">
+					<input type="hidden" name="mode" value="variant">
+					<input type="hidden" name="redirect" value="/variant">
+					<button name="grade" value="bad">Не решил</button>
+					<button name="grade" value="almost">Почти</button>
+					<button name="grade" value="good">Решил</button>
+					<button name="grade" value="perfect">Идеально</button>
+				</form>
+			</div>
+		</li>
+		{{end}}
+	</ol>
+	<a class="button primary" href="/variant">Новый вариант</a>
+</section>
+{{end}}
+{{template "layout" .}}

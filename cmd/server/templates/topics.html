@@ -1,0 +1,19 @@
+{{define "content"}}
+<div class="page-head">
+	<p class="eyebrow">Карта курса</p>
+	<h1>Темы</h1>
+</div>
+<section class="list">
+	{{range .Topics}}
+	<a class="row-card" href="/topic/{{.ID}}">
+		<div>
+			<span class="tag">{{.Chapter}}</span>
+			<h2>{{.Title}}</h2>
+			<p>{{.Description}}</p>
+		</div>
+		<span class="difficulty">сложность {{.Difficulty}}</span>
+	</a>
+	{{end}}
+</section>
+{{end}}
+{{template "layout" .}}

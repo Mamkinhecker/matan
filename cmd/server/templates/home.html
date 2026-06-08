@@ -1,0 +1,26 @@
+{{define "content"}}
+<section class="hero">
+	<div>
+		<p class="eyebrow">Без авторизации, с PostgreSQL</p>
+		<h1>Тренажер для письменных вариантов и устного теста по матану</h1>
+		<p>Учебник превращаем в темы, формулировки, карточки, планы доказательств и экзаменационные варианты.</p>
+		<div class="actions">
+			<a class="button primary" href="/variant">Сгенерировать вариант</a>
+			<a class="button" href="/cards">Учить карточки</a>
+		</div>
+	</div>
+	<div class="metrics">
+		<div><strong>{{index .Stats "topics"}}</strong><span>тем</span></div>
+		<div><strong>{{index .Stats "cards"}}</strong><span>карточек</span></div>
+		<div><strong>{{index .Stats "questions"}}</strong><span>вопросов</span></div>
+		<div><strong>{{index .Stats "proof_choice_games"}}</strong><span>игр</span></div>
+	</div>
+</section>
+<section class="mode-grid">
+	<a href="/formulations"><strong>Формулировки</strong><span>Студент пишет определение или теорему, затем сверяется с эталоном.</span></a>
+	<a href="/proof-game"><strong>Выбери доказательство</strong><span>Нужно узнать правильный краткий ход доказательства среди похожих вариантов.</span></a>
+	<a href="/oral"><strong>Устный тест</strong><span>Один случайный вопрос, самопроверка и отметка результата.</span></a>
+	<a href="/progress"><strong>Прогресс</strong><span>Пока общий demo-прогресс без аккаунтов.</span></a>
+</section>
+{{end}}
+{{template "layout" .}}

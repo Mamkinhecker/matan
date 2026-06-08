@@ -1,0 +1,29 @@
+{{define "content"}}
+<div class="page-head">
+	<p class="eyebrow">{{.Card.TopicTitle}}</p>
+	<h1>Воспроизведи формулировку</h1>
+</div>
+<section class="trainer">
+	<h2>{{.Card.Front}}</h2>
+	<textarea rows="8" placeholder="Напиши формулировку своими словами, потом открой эталон"></textarea>
+	<div class="actions">
+		<button class="button primary" type="button" data-toggle="#ideal-answer">Показать эталон</button>
+		<a class="button" href="/formulations">Следующая</a>
+	</div>
+	<div id="ideal-answer" class="answer hidden">
+		<p>{{.Card.Back}}</p>
+		{{if .Card.Hint}}<p><strong>Проверь ключевые слова:</strong> {{.Card.Hint}}</p>{{end}}
+		<form class="grade-row" method="post" action="/attempts">
+			<input type="hidden" name="target_type" value="card">
+			<input type="hidden" name="target_id" value="{{.Card.ID}}">
+			<input type="hidden" name="mode" value="formulations">
+			<input type="hidden" name="redirect" value="/formulations">
+			<button name="grade" value="bad">Не знаю</button>
+			<button name="grade" value="almost">Почти</button>
+			<button name="grade" value="good">Знаю</button>
+			<button name="grade" value="perfect">Идеально</button>
+		</form>
+	</div>
+</section>
+{{end}}
+{{template "layout" .}}

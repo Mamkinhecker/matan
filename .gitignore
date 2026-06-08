@@ -1,0 +1,12 @@
+.DS_Store
+
+# Go
+/bin/
+*.test
+coverage.out
+
+# Environment
+.env
+
+# Local caches
+.cache/
