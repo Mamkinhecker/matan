@@ -175,3 +175,27 @@ func TestAdminFormsHaveCSRFFields(t *testing.T) {
 		t.Errorf("admin page has %d CSRF fields, want 5", got)
 	}
 }
+
+func TestVariantFormsHaveCSRFFields(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest("GET", "/ikr", nil)
+	(&App{}).render(recorder, request, "variant.html", PageData{
+		Title:        "ИКР",
+		VariantTitle: "Вариант ИКР",
+		Questions: []Question{{
+			ID:             1,
+			ExamKind:       "ikr",
+			Text:           "Задание",
+			ExpectedAnswer: "Решение",
+		}},
+	})
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("render status = %d: %s", recorder.Code, recorder.Body.String())
+	}
+	if got := strings.Count(recorder.Body.String(), `name="csrf_token"`); got != 2 {
+		t.Errorf("variant page has %d CSRF fields, want 2", got)
+	}
+	if strings.Contains(recorder.Body.String(), `value="">`) {
+		t.Error("variant form has an empty CSRF token")
+	}
+}
