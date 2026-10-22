@@ -41,3 +41,33 @@ document.querySelectorAll("[data-timer]").forEach((timer) => {
 		if (seconds <= 0) window.clearInterval(interval);
 	}, 1000);
 });
+
+const menuToggle = document.querySelector(".menu-toggle");
+const siteNav = document.querySelector("#site-nav");
+const navBackdrop = document.querySelector(".nav-backdrop");
+
+if (menuToggle && siteNav && navBackdrop) {
+	const mobileMenu = window.matchMedia("(max-width: 760px)");
+	const setMenuOpen = (open) => {
+		const isOpen = mobileMenu.matches && open;
+		siteNav.classList.toggle("is-open", isOpen);
+		navBackdrop.classList.toggle("is-visible", isOpen);
+		menuToggle.setAttribute("aria-expanded", String(isOpen));
+		menuToggle.setAttribute("aria-label", isOpen ? "Закрыть меню" : "Открыть меню");
+		siteNav.setAttribute("aria-hidden", String(mobileMenu.matches && !isOpen));
+		document.body.classList.toggle("menu-open", isOpen);
+	};
+
+	menuToggle.addEventListener("click", () => {
+		setMenuOpen(!siteNav.classList.contains("is-open"));
+	});
+	navBackdrop.addEventListener("click", () => setMenuOpen(false));
+	siteNav.querySelectorAll("a").forEach((link) => {
+		link.addEventListener("click", () => setMenuOpen(false));
+	});
+	document.addEventListener("keydown", (event) => {
+		if (event.key === "Escape") setMenuOpen(false);
+	});
+	mobileMenu.addEventListener("change", () => setMenuOpen(false));
+	setMenuOpen(false);
+}
