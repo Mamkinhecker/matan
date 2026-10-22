@@ -27,14 +27,15 @@ type App struct {
 }
 
 type Topic struct {
-	ID          int
-	Title       string
-	Chapter     string
-	Description string
-	Difficulty  int
-	Semester    int
-	SortOrder   int
-	Items       []TheoryItem
+	ID           int
+	Title        string
+	Chapter      string
+	Description  string
+	Difficulty   int
+	Semester     int
+	SortOrder    int
+	Items        []TheoryItem
+	MatchedItems []string
 }
 
 type TheoryItem struct {
@@ -52,12 +53,25 @@ type TheoryItem struct {
 type Card struct {
 	ID         int
 	TopicID    int
+	Semester   int
 	Type       string
 	Front      string
 	Back       string
 	Hint       string
 	Difficulty int
 	TopicTitle string
+}
+
+type CardTopicGroup struct {
+	TopicID    int
+	TopicTitle string
+	Cards      []Card
+}
+
+type CardSemesterGroup struct {
+	Semester int
+	Title    string
+	Topics   []CardTopicGroup
 }
 
 type Question struct {
@@ -110,26 +124,30 @@ type LeaderRow struct {
 }
 
 type PageData struct {
-	Title        string
-	Active       string
-	Message      string
-	Stats        map[string]int
-	Topics       []Topic
-	Items        []TheoryItem
-	Topic        Topic
-	Cards        []Card
-	Card         Card
-	Questions    []Question
-	Question     Question
-	Game         ProofChoice
-	Progress     []ProgressRow
-	Leaderboard  []LeaderRow
-	VariantTitle string
-	CurrentUser  string
-	IsAdmin      bool
-	AuthMode     string
-	Next         string
-	CSRFToken    string
+	Title            string
+	Active           string
+	Message          string
+	Stats            map[string]int
+	Topics           []Topic
+	Items            []TheoryItem
+	Topic            Topic
+	Cards            []Card
+	CardGroups       []CardSemesterGroup
+	Card             Card
+	Questions        []Question
+	Question         Question
+	Game             ProofChoice
+	Progress         []ProgressRow
+	Leaderboard      []LeaderRow
+	VariantTitle     string
+	SearchQuery      string
+	SelectedTopic    string
+	SelectedSemester int
+	CurrentUser      string
+	IsAdmin          bool
+	AuthMode         string
+	Next             string
+	CSRFToken        string
 }
 
 func main() {
@@ -239,12 +257,17 @@ func (a *App) home(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) topics(w http.ResponseWriter, r *http.Request) {
-	topics, err := a.listTopics(r.Context())
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
+	queryRunes := []rune(query)
+	if len(queryRunes) > 100 {
+		query = string(queryRunes[:100])
+	}
+	topics, err := a.listTopics(r.Context(), query)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	a.render(w, r, "topics.html", PageData{Title: "Темы", Active: "topics", Topics: topics})
+	a.render(w, r, "topics.html", PageData{Title: "Темы", Active: "topics", Topics: topics, SearchQuery: query})
 }
 
 func (a *App) topic(w http.ResponseWriter, r *http.Request) {
@@ -262,13 +285,27 @@ func (a *App) topic(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) cards(w http.ResponseWriter, r *http.Request) {
-	cards, err := a.listCards(r.Context(), r.URL.Query().Get("topic"))
+	topicID := strings.TrimSpace(r.URL.Query().Get("topic"))
+	semester := semesterParam(r)
+	cards, err := a.listCards(r.Context(), topicID, semester)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	topics, _ := a.listTopics(r.Context())
-	a.render(w, r, "cards.html", PageData{Title: "Карточки", Active: "cards", Cards: cards, Topics: topics})
+	topics, err := a.listTopics(r.Context(), "")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	a.render(w, r, "cards.html", PageData{
+		Title:            "Карточки",
+		Active:           "cards",
+		Cards:            cards,
+		CardGroups:       groupCards(cards),
+		Topics:           topics,
+		SelectedTopic:    topicID,
+		SelectedSemester: semester,
+	})
 }
 
 func (a *App) formulations(w http.ResponseWriter, r *http.Request) {
@@ -353,7 +390,7 @@ func (a *App) progress(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) admin(w http.ResponseWriter, r *http.Request) {
-	topics, err := a.listTopics(r.Context())
+	topics, err := a.listTopics(r.Context(), "")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -577,12 +614,18 @@ func (a *App) stats(ctx context.Context) (map[string]int, error) {
 	return stats, nil
 }
 
-func (a *App) listTopics(ctx context.Context) ([]Topic, error) {
+func (a *App) listTopics(ctx context.Context, search string) ([]Topic, error) {
 	rows, err := a.db.Query(ctx, `
-		select id, title, chapter, description, difficulty, semester, sort_order
-		from topics
-		order by semester, sort_order, id
-	`)
+		select t.id, t.title, t.chapter, t.description, t.difficulty, t.semester, t.sort_order,
+			coalesce(array_agg(distinct ti.title) filter (where ti.id is not null), '{}')
+		from topics t
+		left join theory_items ti on ti.topic_id = t.id and $1 <> ''
+			and (ti.title ilike '%' || $1 || '%' or ti.statement ilike '%' || $1 || '%')
+		where $1 = '' or t.title ilike '%' || $1 || '%' or t.chapter ilike '%' || $1 || '%'
+			or t.description ilike '%' || $1 || '%' or ti.id is not null
+		group by t.id
+		order by t.semester, t.sort_order, t.id
+	`, search)
 	if err != nil {
 		return nil, err
 	}
@@ -591,7 +634,7 @@ func (a *App) listTopics(ctx context.Context) ([]Topic, error) {
 	var topics []Topic
 	for rows.Next() {
 		var topic Topic
-		if err := rows.Scan(&topic.ID, &topic.Title, &topic.Chapter, &topic.Description, &topic.Difficulty, &topic.Semester, &topic.SortOrder); err != nil {
+		if err := rows.Scan(&topic.ID, &topic.Title, &topic.Chapter, &topic.Description, &topic.Difficulty, &topic.Semester, &topic.SortOrder, &topic.MatchedItems); err != nil {
 			return nil, err
 		}
 		topics = append(topics, topic)
@@ -656,15 +699,15 @@ func (a *App) getTopic(ctx context.Context, id int) (Topic, error) {
 	return topic, rows.Err()
 }
 
-func (a *App) listCards(ctx context.Context, topicID string) ([]Card, error) {
+func (a *App) listCards(ctx context.Context, topicID string, semester int) ([]Card, error) {
 	query := `
-		select c.id, c.topic_id, c.type, c.front, c.back, c.hint, c.difficulty, t.title
+		select c.id, c.topic_id, t.semester, c.type, c.front, c.back, c.hint, c.difficulty, t.title
 		from cards c
 		join topics t on t.id = c.topic_id
-		where $1 = '' or c.topic_id::text = $1
-		order by c.difficulty, c.id
+		where ($1 = '' or c.topic_id::text = $1) and ($2 = 0 or t.semester = $2)
+		order by t.semester, t.sort_order, c.difficulty, c.id
 	`
-	rows, err := a.db.Query(ctx, query, topicID)
+	rows, err := a.db.Query(ctx, query, topicID, semester)
 	if err != nil {
 		return nil, err
 	}
@@ -673,12 +716,45 @@ func (a *App) listCards(ctx context.Context, topicID string) ([]Card, error) {
 	var cards []Card
 	for rows.Next() {
 		var card Card
-		if err := rows.Scan(&card.ID, &card.TopicID, &card.Type, &card.Front, &card.Back, &card.Hint, &card.Difficulty, &card.TopicTitle); err != nil {
+		if err := rows.Scan(&card.ID, &card.TopicID, &card.Semester, &card.Type, &card.Front, &card.Back, &card.Hint, &card.Difficulty, &card.TopicTitle); err != nil {
 			return nil, err
 		}
 		cards = append(cards, card)
 	}
 	return cards, rows.Err()
+}
+
+func groupCards(cards []Card) []CardSemesterGroup {
+	groups := make([]CardSemesterGroup, 0)
+	semesterIndexes := make(map[int]int)
+	topicIndexes := make(map[int]map[int]int)
+	for _, card := range cards {
+		semesterIndex, ok := semesterIndexes[card.Semester]
+		if !ok {
+			semesterIndex = len(groups)
+			semesterIndexes[card.Semester] = semesterIndex
+			groups = append(groups, CardSemesterGroup{
+				Semester: card.Semester,
+				Title:    semesterTitle(card.Semester),
+				Topics:   make([]CardTopicGroup, 0),
+			})
+			topicIndexes[card.Semester] = make(map[int]int)
+		}
+
+		semesterTopics := topicIndexes[card.Semester]
+		topicIndex, ok := semesterTopics[card.TopicID]
+		if !ok {
+			topicIndex = len(groups[semesterIndex].Topics)
+			semesterTopics[card.TopicID] = topicIndex
+			groups[semesterIndex].Topics = append(groups[semesterIndex].Topics, CardTopicGroup{
+				TopicID:    card.TopicID,
+				TopicTitle: card.TopicTitle,
+				Cards:      make([]Card, 0),
+			})
+		}
+		groups[semesterIndex].Topics[topicIndex].Cards = append(groups[semesterIndex].Topics[topicIndex].Cards, card)
+	}
+	return groups
 }
 
 func (a *App) randomCard(ctx context.Context) (Card, error) {

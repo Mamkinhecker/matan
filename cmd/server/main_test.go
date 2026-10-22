@@ -199,3 +199,67 @@ func TestVariantFormsHaveCSRFFields(t *testing.T) {
 		t.Error("variant form has an empty CSRF token")
 	}
 }
+
+func TestTopicSearchResultsRenderMatchedTheoryTitles(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest("GET", "/topics?q=Коши", nil)
+	(&App{}).render(recorder, request, "topics.html", PageData{
+		Title:       "Темы",
+		SearchQuery: "Коши",
+		Topics: []Topic{{
+			ID:           1,
+			Title:        "Последовательности",
+			Semester:     1,
+			MatchedItems: []string{"Критерий Коши"},
+		}},
+	})
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("render status = %d: %s", recorder.Code, recorder.Body.String())
+	}
+	for _, expected := range []string{"Коши", "Критерий Коши", "Последовательности"} {
+		if !strings.Contains(recorder.Body.String(), expected) {
+			t.Errorf("topic search page does not contain %q", expected)
+		}
+	}
+}
+
+func TestGroupCardsBySemesterAndTopic(t *testing.T) {
+	cards := []Card{
+		{ID: 1, TopicID: 10, Semester: 1, TopicTitle: "Последовательности"},
+		{ID: 2, TopicID: 10, Semester: 1, TopicTitle: "Последовательности"},
+		{ID: 3, TopicID: 20, Semester: 1, TopicTitle: "Ряды"},
+		{ID: 4, TopicID: 30, Semester: 2, TopicTitle: "Интегралы"},
+	}
+
+	groups := groupCards(cards)
+	if len(groups) != 2 {
+		t.Fatalf("got %d semester groups, want 2", len(groups))
+	}
+	if groups[0].Title != "1 семестр" || len(groups[0].Topics) != 2 {
+		t.Fatalf("unexpected first semester grouping: %#v", groups[0])
+	}
+	if groups[0].Topics[0].TopicTitle != "Последовательности" || len(groups[0].Topics[0].Cards) != 2 {
+		t.Fatalf("cards not grouped by topic: %#v", groups[0].Topics[0])
+	}
+	if groups[1].Title != "2 семестр" || groups[1].Topics[0].TopicTitle != "Интегралы" {
+		t.Fatalf("unexpected second semester grouping: %#v", groups[1])
+	}
+}
+
+func TestCardsPageRendersGroupedCardsWithCSRFToken(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest("GET", "/cards", nil)
+	(&App{}).render(recorder, request, "cards.html", PageData{
+		Title:      "Карточки",
+		CardGroups: groupCards([]Card{{ID: 1, TopicID: 10, Semester: 1, TopicTitle: "Последовательности", Front: "Определение", Back: "Ответ"}}),
+	})
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("render status = %d: %s", recorder.Code, recorder.Body.String())
+	}
+	if !strings.Contains(recorder.Body.String(), "1 семестр") || !strings.Contains(recorder.Body.String(), "Последовательности") {
+		t.Error("cards page is missing semester or topic grouping")
+	}
+	if got := strings.Count(recorder.Body.String(), `name="csrf_token"`); got != 1 {
+		t.Errorf("cards page has %d CSRF fields, want 1", got)
+	}
+}

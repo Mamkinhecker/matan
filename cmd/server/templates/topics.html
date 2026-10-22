@@ -2,8 +2,15 @@
 <div class="page-head">
 	<p class="eyebrow">Карта курса</p>
 	<h1>Темы</h1>
-	<div class="actions"><a class="button" href="#semester-1">1 семестр</a><a class="button" href="#semester-2">2 семестр</a></div>
+	<form class="topic-search" method="get" action="/topics" role="search">
+		<label class="visually-hidden" for="topic-search">Поиск по темам и теоремам</label>
+		<input id="topic-search" type="search" name="q" value="{{.SearchQuery}}" placeholder="Найти тему или теорему…" autocomplete="off">
+		<button class="button primary" type="submit">Найти</button>
+		{{if .SearchQuery}}<a class="button" href="/topics">Сбросить</a>{{end}}
+	</form>
+	{{if .SearchQuery}}<p class="search-summary">Результаты поиска: {{len .Topics}}</p>{{else}}<div class="actions"><a class="button" href="#semester-1">1 семестр</a><a class="button" href="#semester-2">2 семестр</a></div>{{end}}
 </div>
+{{if and .SearchQuery (not .Topics)}}<p class="search-empty">Ничего не найдено. Попробуйте другое название.</p>{{end}}
 <h2 id="semester-1">1 семестр</h2>
 <section class="list">
 	{{range .Topics}}{{if eq .Semester 1}}
@@ -12,12 +19,13 @@
 			<span class="tag">{{.Chapter}}</span>
 			<h2>{{.Title}}</h2>
 			<p>{{.Description}}</p>
+			{{if $.SearchQuery}}{{range .MatchedItems}}<span class="tag matched-theorem">{{.}}</span>{{end}}{{end}}
 		</div>
 		<span class="difficulty">ур. {{.Difficulty}}</span>
 	</a>
 	{{end}}{{end}}
 </section>
 <h2 id="semester-2">2 семестр</h2>
-<section class="list">{{range .Topics}}{{if eq .Semester 2}}<a class="row-card" href="/topic/{{.ID}}"><div><span class="tag">{{.Chapter}}</span><h2>{{.Title}}</h2><p>{{.Description}}</p></div><span class="difficulty">ур. {{.Difficulty}}</span></a>{{end}}{{end}}</section>
+<section class="list">{{range .Topics}}{{if eq .Semester 2}}<a class="row-card" href="/topic/{{.ID}}"><div><span class="tag">{{.Chapter}}</span><h2>{{.Title}}</h2><p>{{.Description}}</p>{{if $.SearchQuery}}{{range .MatchedItems}}<span class="tag matched-theorem">{{.}}</span>{{end}}{{end}}</div><span class="difficulty">ур. {{.Difficulty}}</span></a>{{end}}{{end}}</section>
 {{end}}
 {{template "layout" .}}
