@@ -12,7 +12,9 @@
 <body>
 	<header class="topbar">
 		<a class="brand" href="/">Matan Trainer</a>
-		<button class="menu-toggle" type="button" aria-label="Открыть меню" aria-controls="site-nav" aria-expanded="false">☰</button>
+		<button class="menu-toggle" type="button" aria-label="Открыть меню" aria-controls="site-nav" aria-expanded="false">
+			<span></span><span></span><span></span>
+		</button>
 		<button class="nav-backdrop" type="button" aria-label="Закрыть меню" tabindex="-1"></button>
 		<nav class="nav" id="site-nav">
 			<a class="{{if eq .Active "topics"}}active{{end}}" href="/topics">Темы</a>
