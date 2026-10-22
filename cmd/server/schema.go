@@ -12,6 +12,15 @@ create table if not exists topics (
 	created_at timestamptz not null default now()
 );
 
+create table if not exists users (
+	id bigserial primary key,
+	username text not null unique,
+	display_name text not null,
+	password_hash text not null,
+	is_admin boolean not null default false,
+	created_at timestamptz not null default now()
+);
+
 create table if not exists theory_items (
 	id bigserial primary key,
 	topic_id bigint not null references topics(id) on delete cascade,
@@ -78,6 +87,37 @@ create table if not exists attempts (
 	points int not null default 0,
 	created_at timestamptz not null default now()
 );
+
+create table if not exists sessions (
+	token_hash text primary key,
+	user_id bigint not null references users(id) on delete cascade,
+	expires_at timestamptz not null,
+	created_at timestamptz not null default now()
+);
+
+alter table users add column if not exists is_admin boolean not null default false;
+
+insert into users (id, username, display_name, password_hash)
+values (1, 'legacy_demo', 'Демо-участник', '')
+on conflict (id) do nothing;
+
+insert into users (id, username, display_name, password_hash)
+select distinct a.demo_student_id, 'legacy_' || a.demo_student_id, 'Старый профиль ' || a.demo_student_id, ''
+from attempts a
+where a.demo_student_id <> 1
+on conflict (id) do nothing;
+
+select setval(pg_get_serial_sequence('users', 'id'), greatest((select coalesce(max(id), 1) from users), 1), true);
+
+do $$
+begin
+	if not exists (select 1 from pg_constraint where conname = 'attempts_demo_student_id_fkey') then
+		alter table attempts
+			add constraint attempts_demo_student_id_fkey
+			foreign key (demo_student_id) references users(id) on delete cascade;
+	end if;
+end;
+$$;
 
 create index if not exists idx_theory_items_topic_id on theory_items(topic_id);
 create index if not exists idx_cards_topic_id on cards(topic_id);

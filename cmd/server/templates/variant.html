@@ -11,6 +11,7 @@
 			<span class="tag">{{.TopicTitle}} · {{.ExamKind}} · {{.Type}}</span>
 			<p>{{.Text}}</p>
 			<form class="answer-form" method="post" action="/attempts">
+				<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 				<input type="hidden" name="target_type" value="question">
 				<input type="hidden" name="target_id" value="{{.ID}}">
 				<input type="hidden" name="mode" value="variant">
@@ -23,6 +24,7 @@
 				<p>{{.ExpectedAnswer}}</p>
 			</details>
 			<form class="grade-row" method="post" action="/attempts">
+				<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 				<input type="hidden" name="target_type" value="question">
 				<input type="hidden" name="target_id" value="{{.ID}}">
 				<input type="hidden" name="mode" value="variant">

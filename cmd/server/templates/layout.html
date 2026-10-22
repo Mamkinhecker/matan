@@ -24,7 +24,14 @@
 			<a class="{{if eq .Active "tkr"}}active{{end}}" href="/tkr">ТКР</a>
 			<a class="{{if eq .Active "progress"}}active{{end}}" href="/progress">Прогресс</a>
 			<a class="{{if eq .Active "leaderboard"}}active{{end}}" href="/leaderboard">Топ</a>
-			<a class="{{if eq .Active "admin"}}active{{end}}" href="/admin">Админка</a>
+			{{if .IsAdmin}}<a class="{{if eq .Active "admin"}}active{{end}}" href="/admin">Админка</a>{{end}}
+			{{if .CurrentUser}}
+			<span class="nav-user">{{.CurrentUser}}</span>
+			<form class="nav-logout" method="post" action="/logout"><input type="hidden" name="csrf_token" value="{{.CSRFToken}}"><button type="submit">Выйти</button></form>
+			{{else}}
+			<a class="{{if eq .Active "auth"}}active{{end}}" href="/login">Войти</a>
+			<a href="/register">Регистрация</a>
+			{{end}}
 		</nav>
 	</header>
 	<main class="shell">

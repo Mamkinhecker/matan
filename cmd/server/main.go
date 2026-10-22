@@ -9,6 +9,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -20,8 +21,6 @@ import (
 
 //go:embed templates/*.html static/*
 var assets embed.FS
-
-const demoStudentID = 1
 
 type App struct {
 	db *pgxpool.Pool
@@ -104,10 +103,10 @@ type ProgressRow struct {
 }
 
 type LeaderRow struct {
-	StudentID int
-	Attempts  int
-	Points    int
-	Average   float64
+	Name     string
+	Attempts int
+	Points   int
+	Average  float64
 }
 
 type PageData struct {
@@ -126,6 +125,11 @@ type PageData struct {
 	Progress     []ProgressRow
 	Leaderboard  []LeaderRow
 	VariantTitle string
+	CurrentUser  string
+	IsAdmin      bool
+	AuthMode     string
+	Next         string
+	CSRFToken    string
 }
 
 func main() {
@@ -150,6 +154,15 @@ func main() {
 	if err := migrate(ctx, db); err != nil {
 		log.Fatalf("migrate: %v", err)
 	}
+	if len(os.Args) > 1 {
+		if os.Args[1] != "create-admin" || len(os.Args) != 4 {
+			log.Fatal("usage: go run ./cmd/server create-admin <username> <display name>")
+		}
+		if err := createAdminAccount(ctx, db, os.Args[2], strings.Join(os.Args[3:], " ")); err != nil {
+			log.Fatalf("create admin: %v", err)
+		}
+		return
+	}
 	if err := seed(ctx, db); err != nil {
 		log.Fatalf("seed: %v", err)
 	}
@@ -157,6 +170,11 @@ func main() {
 	app := &App{db: db}
 	mux := http.NewServeMux()
 	mux.Handle("GET /static/", http.FileServerFS(assets))
+	mux.HandleFunc("GET /login", app.loginPage)
+	mux.HandleFunc("POST /login", app.login)
+	mux.HandleFunc("GET /register", app.registerPage)
+	mux.HandleFunc("POST /register", app.register)
+	mux.HandleFunc("POST /logout", app.logout)
 	mux.HandleFunc("GET /", app.home)
 	mux.HandleFunc("GET /topics", app.topics)
 	mux.HandleFunc("GET /topic/", app.topic)
@@ -170,13 +188,13 @@ func main() {
 	mux.HandleFunc("GET /tkr", app.tkr)
 	mux.HandleFunc("GET /progress", app.progress)
 	mux.HandleFunc("GET /leaderboard", app.leaderboard)
-	mux.HandleFunc("GET /admin", app.admin)
+	mux.Handle("GET /admin", app.adminOnly(http.HandlerFunc(app.admin)))
 	mux.HandleFunc("POST /attempts", app.recordAttempt)
-	mux.HandleFunc("POST /admin/topics", app.createTopic)
-	mux.HandleFunc("POST /admin/theory", app.createTheory)
-	mux.HandleFunc("POST /admin/cards", app.createCard)
-	mux.HandleFunc("POST /admin/questions", app.createQuestion)
-	mux.HandleFunc("POST /admin/proof-games", app.createProofGame)
+	mux.Handle("POST /admin/topics", app.adminOnly(app.requireCSRF(http.HandlerFunc(app.createTopic))))
+	mux.Handle("POST /admin/theory", app.adminOnly(app.requireCSRF(http.HandlerFunc(app.createTheory))))
+	mux.Handle("POST /admin/cards", app.adminOnly(app.requireCSRF(http.HandlerFunc(app.createCard))))
+	mux.Handle("POST /admin/questions", app.adminOnly(app.requireCSRF(http.HandlerFunc(app.createQuestion))))
+	mux.Handle("POST /admin/proof-games", app.adminOnly(app.requireCSRF(http.HandlerFunc(app.createProofGame))))
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -187,12 +205,21 @@ func main() {
 	}
 	addr := port
 	log.Printf("matan trainer listening on http://localhost%s", addr)
-	log.Fatal(http.ListenAndServe(addr, mux))
+	log.Fatal(http.ListenAndServe(addr, app.authenticate(mux)))
 }
 
-func (a *App) render(w http.ResponseWriter, name string, data PageData) {
+func (a *App) render(w http.ResponseWriter, r *http.Request, name string, data PageData) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	tmpl, err := template.New(name).Funcs(template.FuncMap{"add": func(a, b int) int { return a + b }}).ParseFS(assets, "templates/layout.html", "templates/"+name)
+	if user, ok := currentUser(r); ok {
+		data.CurrentUser = user.DisplayName
+		data.IsAdmin = user.IsAdmin
+	}
+	data.CSRFToken = csrfToken(w, r)
+	if data.CSRFToken == "" {
+		http.Error(w, "Не удалось подготовить защищённую форму.", http.StatusInternalServerError)
+		return
+	}
+	tmpl, err := template.New(name).Funcs(templateFunctions()).ParseFS(assets, "templates/layout.html", "templates/"+name)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -208,7 +235,7 @@ func (a *App) home(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	a.render(w, "home.html", PageData{Title: "Matan Trainer", Active: "home", Stats: stats})
+	a.render(w, r, "home.html", PageData{Title: "Matan Trainer", Active: "home", Stats: stats})
 }
 
 func (a *App) topics(w http.ResponseWriter, r *http.Request) {
@@ -217,7 +244,7 @@ func (a *App) topics(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	a.render(w, "topics.html", PageData{Title: "Темы", Active: "topics", Topics: topics})
+	a.render(w, r, "topics.html", PageData{Title: "Темы", Active: "topics", Topics: topics})
 }
 
 func (a *App) topic(w http.ResponseWriter, r *http.Request) {
@@ -231,7 +258,7 @@ func (a *App) topic(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	a.render(w, "topic.html", PageData{Title: topic.Title, Active: "topics", Topic: topic})
+	a.render(w, r, "topic.html", PageData{Title: topic.Title, Active: "topics", Topic: topic})
 }
 
 func (a *App) cards(w http.ResponseWriter, r *http.Request) {
@@ -241,7 +268,7 @@ func (a *App) cards(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	topics, _ := a.listTopics(r.Context())
-	a.render(w, "cards.html", PageData{Title: "Карточки", Active: "cards", Cards: cards, Topics: topics})
+	a.render(w, r, "cards.html", PageData{Title: "Карточки", Active: "cards", Cards: cards, Topics: topics})
 }
 
 func (a *App) formulations(w http.ResponseWriter, r *http.Request) {
@@ -250,7 +277,7 @@ func (a *App) formulations(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	a.render(w, "formulations.html", PageData{Title: "Формулировки", Active: "formulations", Card: card})
+	a.render(w, r, "formulations.html", PageData{Title: "Формулировки", Active: "formulations", Card: card})
 }
 
 func (a *App) proofGame(w http.ResponseWriter, r *http.Request) {
@@ -259,7 +286,7 @@ func (a *App) proofGame(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	a.render(w, "proof_game.html", PageData{Title: "Доказательства", Active: "proof-game", Game: game})
+	a.render(w, r, "proof_game.html", PageData{Title: "Доказательства", Active: "proof-game", Game: game})
 }
 
 func (a *App) oral(w http.ResponseWriter, r *http.Request) {
@@ -268,7 +295,7 @@ func (a *App) oral(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	a.render(w, "oral.html", PageData{Title: "Устный тест", Active: "oral", Question: question})
+	a.render(w, r, "oral.html", PageData{Title: "Устный тест", Active: "oral", Question: question})
 }
 
 func (a *App) variant(w http.ResponseWriter, r *http.Request) {
@@ -278,7 +305,7 @@ func (a *App) variant(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	a.render(w, "variant.html", PageData{Title: "Письменный вариант", Active: "variant", Questions: questions, VariantTitle: "Смешанный вариант · " + semesterTitle(semester)})
+	a.render(w, r, "variant.html", PageData{Title: "Письменный вариант", Active: "variant", Questions: questions, VariantTitle: "Смешанный вариант · " + semesterTitle(semester)})
 }
 
 func (a *App) theoryTest(w http.ResponseWriter, r *http.Request) {
@@ -288,7 +315,7 @@ func (a *App) theoryTest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	a.render(w, "variant.html", PageData{Title: "Тест по теории", Active: "theory-test", Questions: questions, VariantTitle: "Тест по теории · " + semesterTitle(semester)})
+	a.render(w, r, "variant.html", PageData{Title: "Тест по теории", Active: "theory-test", Questions: questions, VariantTitle: "Тест по теории · " + semesterTitle(semester)})
 }
 
 func (a *App) ikr(w http.ResponseWriter, r *http.Request) {
@@ -298,7 +325,7 @@ func (a *App) ikr(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	a.render(w, "variant.html", PageData{Title: "ИКР", Active: "ikr", Questions: questions, VariantTitle: "Вариант ИКР · " + semesterTitle(semester)})
+	a.render(w, r, "variant.html", PageData{Title: "ИКР", Active: "ikr", Questions: questions, VariantTitle: "Вариант ИКР · " + semesterTitle(semester)})
 }
 
 func (a *App) tkr(w http.ResponseWriter, r *http.Request) {
@@ -308,16 +335,21 @@ func (a *App) tkr(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	a.render(w, "variant.html", PageData{Title: "ТКР", Active: "tkr", Questions: questions, VariantTitle: "Вариант ТКР · " + semesterTitle(semester)})
+	a.render(w, r, "variant.html", PageData{Title: "ТКР", Active: "tkr", Questions: questions, VariantTitle: "Вариант ТКР · " + semesterTitle(semester)})
 }
 
 func (a *App) progress(w http.ResponseWriter, r *http.Request) {
-	progress, err := a.progressRows(r.Context())
+	user, ok := currentUser(r)
+	if !ok {
+		http.Redirect(w, r, "/login?next=%2Fprogress", http.StatusSeeOther)
+		return
+	}
+	progress, err := a.progressRows(r.Context(), user.ID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	a.render(w, "progress.html", PageData{Title: "Прогресс", Active: "progress", Progress: progress})
+	a.render(w, r, "progress.html", PageData{Title: "Прогресс", Active: "progress", Progress: progress})
 }
 
 func (a *App) admin(w http.ResponseWriter, r *http.Request) {
@@ -336,7 +368,7 @@ func (a *App) admin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	a.render(w, "admin.html", PageData{
+	a.render(w, r, "admin.html", PageData{
 		Title:   "Админка",
 		Active:  "admin",
 		Message: r.URL.Query().Get("message"),
@@ -349,6 +381,16 @@ func (a *App) admin(w http.ResponseWriter, r *http.Request) {
 func (a *App) recordAttempt(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if !validCSRF(r) {
+		http.Error(w, "Форма устарела. Обновите страницу и попробуйте ещё раз.", http.StatusForbidden)
+		return
+	}
+	user, ok := currentUser(r)
+	if !ok {
+		next := safeRedirectPath(r.FormValue("redirect"), "/")
+		http.Redirect(w, r, "/login?next="+url.QueryEscape(next), http.StatusSeeOther)
 		return
 	}
 	targetID, _ := strconv.Atoi(r.FormValue("target_id"))
@@ -364,16 +406,23 @@ func (a *App) recordAttempt(w http.ResponseWriter, r *http.Request) {
 	_, err := a.db.Exec(r.Context(), `
 		insert into attempts (demo_student_id, target_type, target_id, mode, grade, notes, student_answer, feedback, points)
 		values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-	`, demoStudentID, r.FormValue("target_type"), targetID, r.FormValue("mode"), grade, r.FormValue("notes"), studentAnswer, feedback, gradePoints(grade))
+	`, user.ID, r.FormValue("target_type"), targetID, r.FormValue("mode"), grade, r.FormValue("notes"), studentAnswer, feedback, gradePoints(grade))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	redirect(w, r, r.FormValue("redirect"))
+	http.Redirect(w, r, safeRedirectPath(r.FormValue("redirect"), "/"), http.StatusSeeOther)
 }
 
 func (a *App) leaderboard(w http.ResponseWriter, r *http.Request) {
-	rows, err := a.db.Query(r.Context(), `select demo_student_id, count(*), coalesce(sum(points), 0), coalesce(avg(points), 0) from attempts group by demo_student_id order by sum(points) desc, count(*) desc limit 50`)
+	rows, err := a.db.Query(r.Context(), `
+		select u.display_name, count(*), coalesce(sum(a.points), 0), coalesce(avg(a.points), 0)
+		from attempts a
+		join users u on u.id = a.demo_student_id
+		group by u.id, u.display_name
+		order by sum(a.points) desc, count(*) desc, u.display_name
+		limit 50
+	`)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -382,13 +431,13 @@ func (a *App) leaderboard(w http.ResponseWriter, r *http.Request) {
 	var leaders []LeaderRow
 	for rows.Next() {
 		var row LeaderRow
-		if err := rows.Scan(&row.StudentID, &row.Attempts, &row.Points, &row.Average); err != nil {
+		if err := rows.Scan(&row.Name, &row.Attempts, &row.Points, &row.Average); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		leaders = append(leaders, row)
 	}
-	a.render(w, "leaderboard.html", PageData{Title: "Топ", Active: "leaderboard", Leaderboard: leaders})
+	a.render(w, r, "leaderboard.html", PageData{Title: "Топ", Active: "leaderboard", Leaderboard: leaders})
 }
 
 func gradePoints(grade string) int {
@@ -721,14 +770,14 @@ func (a *App) variantQuestions(ctx context.Context, examKind string, limit int, 
 	return questions, rows.Err()
 }
 
-func (a *App) progressRows(ctx context.Context) ([]ProgressRow, error) {
+func (a *App) progressRows(ctx context.Context, studentID int64) ([]ProgressRow, error) {
 	rows, err := a.db.Query(ctx, `
 		select mode, grade, count(*) as attempts, max(created_at)
 		from attempts
 		where demo_student_id = $1
 		group by mode, grade
 		order by max(created_at) desc
-	`, demoStudentID)
+	`, studentID)
 	if err != nil {
 		return nil, err
 	}

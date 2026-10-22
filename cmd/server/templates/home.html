@@ -1,7 +1,7 @@
 {{define "content"}}
 <section class="dashboard">
 	<div class="intro">
-		<p class="eyebrow">PostgreSQL · без авторизации</p>
+		<p class="eyebrow">PostgreSQL · личный прогресс и рейтинг</p>
 		<h1>Matan Trainer</h1>
 		<p>Тренажер под реальные письменные варианты и устный тест: темы, формулировки, планы доказательств, карточки и самопроверка.</p>
 		<div class="actions">
@@ -26,7 +26,7 @@
 	<a href="/theory-test"><strong>Тест по теории</strong><span>Определения, свойства, формулировки и вопросы верно/неверно.</span></a>
 	<a href="/ikr"><strong>ИКР</strong><span>Вычислительные и исследовательские задания из контрольных.</span></a>
 	<a href="/tkr"><strong>ТКР</strong><span>Теоретические варианты: доказать, вывести, привести пример.</span></a>
-	<a href="/admin"><strong>Наполнение</strong><span>Добавление тем, карточек, вопросов и планов доказательств в БД.</span></a>
+	{{if .IsAdmin}}<a href="/admin"><strong>Наполнение</strong><span>Добавление тем, карточек, вопросов и планов доказательств в БД.</span></a>{{end}}
 </section>
 {{end}}
 {{template "layout" .}}

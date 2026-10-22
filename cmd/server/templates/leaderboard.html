@@ -1,7 +1,11 @@
 {{define "content"}}
 <div class="page-head"><p class="eyebrow">Результаты тренировок</p><h1>Топ по баллам</h1><p>Баллы начисляются за проверенные ответы: 4 за полный, 3 за хороший, 1 за почти решённый.</p></div>
-<section class="table-wrap"><table><thead><tr><th>Место</th><th>Студент</th><th>Попытки</th><th>Баллы</th><th>Средний балл</th></tr></thead><tbody>
-{{range $i, $row := .Leaderboard}}<tr><td>{{add $i 1}}</td><td>Студент #{{$row.StudentID}}</td><td>{{$row.Attempts}}</td><td><strong>{{$row.Points}}</strong></td><td>{{printf "%.2f" $row.Average}}</td></tr>{{else}}<tr><td colspan="5">Пока нет результатов.</td></tr>{{end}}
+<section class="table-wrap"><table class="leaderboard-table"><thead><tr><th>Место</th><th>Участник</th><th>Попытки</th><th>Баллы</th><th>Средний балл</th></tr></thead><tbody>
+{{range $i, $row := .Leaderboard}}<tr class="{{if eq $i 0}}podium-gold{{else if eq $i 1}}podium-silver{{else if eq $i 2}}podium-bronze{{end}}">
+	<td><span class="rank-badge">{{add $i 1}}</span></td>
+	<td><span class="leader-identity"><span class="leader-avatar">{{initials $row.Name}}</span><strong>{{$row.Name}}</strong></span></td>
+	<td>{{$row.Attempts}}</td><td><strong class="leader-points">{{$row.Points}}</strong></td><td>{{printf "%.2f" $row.Average}}</td>
+</tr>{{else}}<tr><td colspan="5" class="leaderboard-empty">Пока нет результатов. Войди в аккаунт и запиши первую попытку!</td></tr>{{end}}
 </tbody></table></section>
 {{end}}
 {{template "layout" .}}

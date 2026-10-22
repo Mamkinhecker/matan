@@ -15,6 +15,7 @@
 		<p>{{.Card.Back}}</p>
 		{{if .Card.Hint}}<p><b>Ключевые слова:</b> {{.Card.Hint}}</p>{{end}}
 		<form class="grade-row" method="post" action="/attempts">
+			<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 			<input type="hidden" name="target_type" value="card">
 			<input type="hidden" name="target_id" value="{{.Card.ID}}">
 			<input type="hidden" name="mode" value="formulations">

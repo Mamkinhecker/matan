@@ -23,6 +23,7 @@
 			<span class="tag">Ответ</span>
 			<p>{{.Back}}</p>
 			<form class="grade-row" method="post" action="/attempts">
+				<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 				<input type="hidden" name="target_type" value="card">
 				<input type="hidden" name="target_id" value="{{.ID}}">
 				<input type="hidden" name="mode" value="cards">

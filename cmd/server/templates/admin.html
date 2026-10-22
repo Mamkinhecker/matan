@@ -12,6 +12,7 @@
 </section>
 <section class="admin-grid">
 	<form class="panel form-panel" method="post" action="/admin/topics">
+		<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 		<h2>Тема</h2>
 		<input name="title" placeholder="Название" required>
 		<input name="chapter" placeholder="Раздел">
@@ -21,6 +22,7 @@
 	</form>
 
 	<form class="panel form-panel" method="post" action="/admin/theory">
+		<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 		<h2>Теория</h2>
 		<select name="topic_id" required>{{range .Topics}}<option value="{{.ID}}">{{.Title}}</option>{{end}}</select>
 		<select name="type"><option value="definition">definition</option><option value="theorem">theorem</option><option value="criterion">criterion</option><option value="property">property</option><option value="example">example</option><option value="proof">proof</option></select>
@@ -34,6 +36,7 @@
 	</form>
 
 	<form class="panel form-panel" method="post" action="/admin/cards">
+		<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 		<h2>Карточка</h2>
 		<select name="topic_id" required>{{range .Topics}}<option value="{{.ID}}">{{.Title}}</option>{{end}}</select>
 		<select name="theory_item_id"><option value="0">Без привязки</option>{{range .Items}}<option value="{{.ID}}">{{.Title}}</option>{{end}}</select>
@@ -46,6 +49,7 @@
 	</form>
 
 	<form class="panel form-panel" method="post" action="/admin/questions">
+		<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 		<h2>Вопрос</h2>
 		<select name="topic_id" required>{{range .Topics}}<option value="{{.ID}}">{{.Title}}</option>{{end}}</select>
 		<select name="theory_item_id"><option value="0">Без привязки</option>{{range .Items}}<option value="{{.ID}}">{{.Title}}</option>{{end}}</select>
@@ -60,6 +64,7 @@
 	</form>
 
 	<form class="panel form-panel" method="post" action="/admin/proof-games">
+		<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 		<h2>Игра доказательства</h2>
 		<select name="theory_item_id" required>{{range .Items}}<option value="{{.ID}}">{{.Title}}</option>{{end}}</select>
 		<textarea name="question" rows="2" placeholder="Вопрос" required></textarea>

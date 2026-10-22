@@ -1,0 +1,25 @@
+{{define "content"}}
+<section class="auth-card">
+	<p class="eyebrow">{{if eq .AuthMode "register"}}Новый профиль{{else}}Рады видеть снова{{end}}</p>
+	<h1>{{if eq .AuthMode "register"}}Регистрация{{else}}Вход{{end}}</h1>
+	<p class="auth-description">Сохраняй результаты тренировок и участвуй в общем рейтинге.</p>
+	{{if .Message}}<p class="notice" role="alert">{{.Message}}</p>{{end}}
+	<form class="auth-form" method="post" action="/{{.AuthMode}}">
+		<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+		<input type="hidden" name="next" value="{{.Next}}">
+		{{if eq .AuthMode "register"}}
+		<label for="display-name">Имя в рейтинге</label>
+		<input id="display-name" name="display_name" autocomplete="name" maxlength="40" required>
+		{{end}}
+		<label for="username">Логин</label>
+		<input id="username" name="username" autocomplete="username" minlength="3" maxlength="32" required>
+		<label for="password">Пароль</label>
+		<input id="password" name="password" type="password" autocomplete="{{if eq .AuthMode "register"}}new-password{{else}}current-password{{end}}" minlength="8" maxlength="128" required>
+		<button class="button primary" type="submit">{{if eq .AuthMode "register"}}Создать аккаунт{{else}}Войти{{end}}</button>
+	</form>
+	<p class="auth-switch">
+		{{if eq .AuthMode "register"}}Уже есть аккаунт? <a href="/login?next={{urlquery .Next}}">Войти</a>{{else}}Впервые здесь? <a href="/register?next={{urlquery .Next}}">Создать аккаунт</a>{{end}}
+	</p>
+</section>
+{{end}}
+{{template "layout" .}}
