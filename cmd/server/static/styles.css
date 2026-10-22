@@ -685,10 +685,13 @@ th {
 		height: 100dvh;
 		max-height: 100dvh;
 		flex-direction: column;
+		flex-wrap: nowrap;
 		align-items: stretch;
+		align-content: flex-start;
 		justify-content: flex-start;
 		gap: 4px;
 		overflow-y: auto;
+		overflow-x: hidden;
 		overscroll-behavior-y: contain;
 		padding: 76px 16px 24px;
 		-webkit-overflow-scrolling: touch;
