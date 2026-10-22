@@ -130,8 +130,11 @@ type PageData struct {
 
 func main() {
 	ctx := context.Background()
-	databaseURL := os.Getenv("DATABASE_URL")
+	databaseURL := strings.TrimSpace(os.Getenv("DATABASE_URL"))
 	if databaseURL == "" {
+		if os.Getenv("RENDER") == "true" {
+			log.Fatal("DATABASE_URL is required on Render; add the Supabase Session pooler URI in the service Environment settings")
+		}
 		databaseURL = "postgres://postgres:postgres@localhost:5544/matan_trainer?sslmode=disable"
 	}
 
