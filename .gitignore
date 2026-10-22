@@ -2,6 +2,7 @@
 
 # Go
 /bin/
+/server
 *.test
 coverage.out
 

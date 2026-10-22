@@ -1,0 +1,44 @@
+{{define "content"}}
+<div class="page-head">
+	<p class="eyebrow">Письменная работа</p>
+	<h1>{{.VariantTitle}}</h1>
+	<div class="actions"><a class="button" href="?semester=1">1 семестр</a><a class="button" href="?semester=2">2 семестр</a><a class="button" href="?semester=0">Все темы</a></div>
+</div>
+<section class="variant">
+	<ol>
+		{{range .Questions}}
+		<li>
+			<span class="tag">{{.TopicTitle}} · {{.ExamKind}} · {{.Type}}</span>
+			<p>{{.Text}}</p>
+			<form class="answer-form" method="post" action="/attempts">
+				<input type="hidden" name="target_type" value="question">
+				<input type="hidden" name="target_id" value="{{.ID}}">
+				<input type="hidden" name="mode" value="variant">
+				<input type="hidden" name="redirect" value="{{if eq .ExamKind "ikr"}}/ikr{{else if eq .ExamKind "tkr"}}/tkr{{else}}/theory-test{{end}}">
+				<textarea name="student_answer" rows="4" placeholder="Напиши решение или доказательство. Валидатор проверит обязательные смысловые шаги."></textarea>
+				<button class="button primary" name="grade" value="good">Проверить ответ</button>
+			</form>
+			<details class="solution">
+				<summary>Полное решение</summary>
+				<p>{{.ExpectedAnswer}}</p>
+			</details>
+			<form class="grade-row" method="post" action="/attempts">
+				<input type="hidden" name="target_type" value="question">
+				<input type="hidden" name="target_id" value="{{.ID}}">
+				<input type="hidden" name="mode" value="variant">
+				<input type="hidden" name="redirect" value="{{if eq .ExamKind "ikr"}}/ikr{{else if eq .ExamKind "tkr"}}/tkr{{else}}/theory-test{{end}}">
+				<button name="grade" value="bad">Не решил</button>
+				<button name="grade" value="almost">Почти</button>
+				<button name="grade" value="good">Решил</button>
+				<button name="grade" value="perfect">Идеально</button>
+			</form>
+		</li>
+		{{end}}
+	</ol>
+	<a class="button primary" href="/variant?semester=1">Смешанный вариант</a>
+	<a class="button" href="/theory-test?semester=1">Теория</a>
+	<a class="button" href="/ikr?semester=1">ИКР</a>
+	<a class="button" href="/tkr?semester=1">ТКР</a>
+</section>
+{{end}}
+{{template "layout" .}}

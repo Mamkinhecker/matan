@@ -1,0 +1,26 @@
+{{define "content"}}
+<div class="page-head">
+	<p class="eyebrow">{{.Game.TopicTitle}}</p>
+	<h1>Выбери доказательство</h1>
+	<p>{{.Game.Question}}</p>
+</div>
+<section class="choice-game" data-proof-game>
+	{{range .Game.Options}}
+	<button class="choice" type="button" data-correct="{{.Correct}}">{{.Text}}</button>
+	{{end}}
+	<div class="answer hidden" data-proof-result>
+		<h2>{{.Game.TheoryTitle}}</h2>
+		<p>{{.Game.Explanation}}</p>
+		<form class="grade-row" method="post" action="/attempts">
+			<input type="hidden" name="target_type" value="proof_game">
+			<input type="hidden" name="target_id" value="{{.Game.ID}}">
+			<input type="hidden" name="mode" value="proof_game">
+			<input type="hidden" name="redirect" value="/proof-game">
+			<button name="grade" value="bad">Не угадал</button>
+			<button name="grade" value="good">Понял</button>
+			<button name="grade" value="perfect">Легко</button>
+		</form>
+	</div>
+</section>
+{{end}}
+{{template "layout" .}}

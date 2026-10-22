@@ -1,0 +1,42 @@
+{{define "content"}}
+<div class="page-head">
+	<p class="eyebrow">Quizlet-режим</p>
+	<h1>Карточки</h1>
+	<form class="inline-form" method="get" action="/cards">
+		<select name="topic">
+			<option value="">Все темы</option>
+			{{range .Topics}}<option value="{{.ID}}">{{.Title}}</option>{{end}}
+		</select>
+		<button class="button" type="submit">Фильтр</button>
+	</form>
+</div>
+<section class="card-grid">
+	{{range .Cards}}
+	<article class="study-card" data-flip-card>
+		<div class="card-face front">
+			<span class="tag">{{.TopicTitle}} · {{.Type}}</span>
+			<h2>{{.Front}}</h2>
+			{{if .Hint}}<p>{{.Hint}}</p>{{end}}
+			<button class="button primary" type="button" data-show-answer>Показать ответ</button>
+		</div>
+		<div class="card-face back hidden">
+			<span class="tag">Ответ</span>
+			<p>{{.Back}}</p>
+			<form class="grade-row" method="post" action="/attempts">
+				<input type="hidden" name="target_type" value="card">
+				<input type="hidden" name="target_id" value="{{.ID}}">
+				<input type="hidden" name="mode" value="cards">
+				<input type="hidden" name="redirect" value="/cards">
+				<button name="grade" value="bad">Не знаю</button>
+				<button name="grade" value="almost">Почти</button>
+				<button name="grade" value="good">Знаю</button>
+				<button name="grade" value="perfect">Идеально</button>
+			</form>
+		</div>
+	</article>
+	{{else}}
+	<p>Карточек пока нет.</p>
+	{{end}}
+</section>
+{{end}}
+{{template "layout" .}}

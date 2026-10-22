@@ -1,0 +1,7 @@
+{{define "content"}}
+<div class="page-head"><p class="eyebrow">Результаты тренировок</p><h1>Топ по баллам</h1><p>Баллы начисляются за проверенные ответы: 4 за полный, 3 за хороший, 1 за почти решённый.</p></div>
+<section class="table-wrap"><table><thead><tr><th>Место</th><th>Студент</th><th>Попытки</th><th>Баллы</th><th>Средний балл</th></tr></thead><tbody>
+{{range $i, $row := .Leaderboard}}<tr><td>{{add $i 1}}</td><td>Студент #{{$row.StudentID}}</td><td>{{$row.Attempts}}</td><td><strong>{{$row.Points}}</strong></td><td>{{printf "%.2f" $row.Average}}</td></tr>{{else}}<tr><td colspan="5">Пока нет результатов.</td></tr>{{end}}
+</tbody></table></section>
+{{end}}
+{{template "layout" .}}

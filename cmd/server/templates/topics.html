@@ -1,0 +1,23 @@
+{{define "content"}}
+<div class="page-head">
+	<p class="eyebrow">Карта курса</p>
+	<h1>Темы</h1>
+	<div class="actions"><a class="button" href="#semester-1">1 семестр</a><a class="button" href="#semester-2">2 семестр</a></div>
+</div>
+<h2 id="semester-1">1 семестр</h2>
+<section class="list">
+	{{range .Topics}}{{if eq .Semester 1}}
+	<a class="row-card" href="/topic/{{.ID}}">
+		<div>
+			<span class="tag">{{.Chapter}}</span>
+			<h2>{{.Title}}</h2>
+			<p>{{.Description}}</p>
+		</div>
+		<span class="difficulty">ур. {{.Difficulty}}</span>
+	</a>
+	{{end}}{{end}}
+</section>
+<h2 id="semester-2">2 семестр</h2>
+<section class="list">{{range .Topics}}{{if eq .Semester 2}}<a class="row-card" href="/topic/{{.ID}}"><div><span class="tag">{{.Chapter}}</span><h2>{{.Title}}</h2><p>{{.Description}}</p></div><span class="difficulty">ур. {{.Difficulty}}</span></a>{{end}}{{end}}</section>
+{{end}}
+{{template "layout" .}}

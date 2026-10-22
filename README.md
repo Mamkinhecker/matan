@@ -7,7 +7,7 @@
 Нужен PostgreSQL. По умолчанию приложение ждёт:
 
 ```text
-postgres://postgres:postgres@localhost:5432/matan_trainer?sslmode=disable
+postgres://postgres:postgres@localhost:5544/matan_trainer?sslmode=disable
 ```
 
 Можно переопределить:
@@ -15,6 +15,13 @@ postgres://postgres:postgres@localhost:5432/matan_trainer?sslmode=disable
 ```sh
 export DATABASE_URL='postgres://user:password@localhost:5432/matan_trainer?sslmode=disable'
 go run ./cmd/server
+```
+
+Для локального PostgreSQL через Docker:
+
+```sh
+docker compose up -d postgres
+make run
 ```
 
 При старте приложение само создаёт таблицы и засевает демо-данные, если база пустая.
@@ -28,4 +35,15 @@ go run ./cmd/server
 - `/proof-game` — игра “выбери доказательство”
 - `/oral` — устный тест
 - `/variant` — письменный вариант
+- `/theory-test` — тест по теории
+- `/ikr` — варианты индивидуальных контрольных работ
+- `/tkr` — варианты теоретических контрольных работ
 - `/progress` — прогресс
+- `/admin` — наполнение базы темами, карточками, вопросами и играми доказательств
+
+При каждом старте выполняется идемпотентное расширение базы: добавляются новые темы,
+карточки, вопросы и типы вариантов без удаления уже сохранённых попыток.
+
+В проекте есть `cmd/pdfextract`: он извлекает постраничный текст из учебников для
+проверки и дальнейшего уточнения конспектов. Каталог тем и стартовые вопросы
+загружаются автоматически из `schema.go`.

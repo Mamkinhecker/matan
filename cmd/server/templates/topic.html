@@ -1,0 +1,21 @@
+{{define "content"}}
+<div class="page-head">
+	<p class="eyebrow">{{.Topic.Chapter}}</p>
+	<h1>{{.Topic.Title}}</h1>
+	<p>{{.Topic.Description}}</p>
+</div>
+<section class="stack">
+	{{range .Topic.Items}}
+	<article class="panel">
+		<span class="tag">{{.Type}}</span>
+		<h2>{{.Title}}</h2>
+		{{if .Statement}}<p><b>Формулировка:</b> {{.Statement}}</p>{{end}}
+		{{if .Explanation}}<p><b>Пояснение:</b> {{.Explanation}}</p>{{end}}
+		{{if .ProofFull}}<details class="solution"><summary>Полное доказательство</summary><p>{{.ProofFull}}</p></details>{{end}}
+	</article>
+	{{else}}
+	<p>В этой теме пока нет теории.</p>
+	{{end}}
+</section>
+{{end}}
+{{template "layout" .}}

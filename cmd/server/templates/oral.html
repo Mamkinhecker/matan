@@ -1,0 +1,30 @@
+{{define "content"}}
+<div class="page-head">
+	<p class="eyebrow">{{.Question.TopicTitle}}</p>
+	<h1>Устный тест</h1>
+</div>
+<section class="trainer">
+	<span class="tag">{{.Question.Type}}</span>
+	<h2>{{.Question.Text}}</h2>
+	<div class="timer" data-timer="180">03:00</div>
+	<div class="actions">
+		<button class="button primary" type="button" data-toggle="#oral-answer">Показать ответ</button>
+		<a class="button" href="/oral">Следующий вопрос</a>
+	</div>
+	<div id="oral-answer" class="answer hidden">
+		<p>{{.Question.ExpectedAnswer}}</p>
+		<p><b>Кратко:</b> {{.Question.ShortAnswer}}</p>
+		<form class="grade-row" method="post" action="/attempts">
+			<input type="hidden" name="target_type" value="question">
+			<input type="hidden" name="target_id" value="{{.Question.ID}}">
+			<input type="hidden" name="mode" value="oral">
+			<input type="hidden" name="redirect" value="/oral">
+			<button name="grade" value="bad">Не ответил</button>
+			<button name="grade" value="almost">С подсказкой</button>
+			<button name="grade" value="good">Ответил</button>
+			<button name="grade" value="perfect">Четко</button>
+		</form>
+	</div>
+</section>
+{{end}}
+{{template "layout" .}}

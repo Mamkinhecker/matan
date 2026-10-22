@@ -1,0 +1,36 @@
+{{define "layout"}}
+<!doctype html>
+<html lang="ru">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>{{.Title}}</title>
+	<link rel="stylesheet" href="/static/styles.css">
+	<script>window.MathJax = {tex: {inlineMath: [['\\(', '\\)'], ['$', '$']]}, svg: {fontCache: 'global'}};</script>
+	<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+</head>
+<body>
+	<header class="topbar">
+		<a class="brand" href="/">Matan Trainer</a>
+		<nav class="nav">
+			<a class="{{if eq .Active "topics"}}active{{end}}" href="/topics">Темы</a>
+			<a class="{{if eq .Active "cards"}}active{{end}}" href="/cards">Карточки</a>
+			<a class="{{if eq .Active "formulations"}}active{{end}}" href="/formulations">Формулировки</a>
+			<a class="{{if eq .Active "proof-game"}}active{{end}}" href="/proof-game">Доказательства</a>
+			<a class="{{if eq .Active "oral"}}active{{end}}" href="/oral">Устный</a>
+			<a class="{{if eq .Active "variant"}}active{{end}}" href="/variant">Вариант</a>
+			<a class="{{if eq .Active "theory-test"}}active{{end}}" href="/theory-test">Теория</a>
+			<a class="{{if eq .Active "ikr"}}active{{end}}" href="/ikr">ИКР</a>
+			<a class="{{if eq .Active "tkr"}}active{{end}}" href="/tkr">ТКР</a>
+			<a class="{{if eq .Active "progress"}}active{{end}}" href="/progress">Прогресс</a>
+			<a class="{{if eq .Active "leaderboard"}}active{{end}}" href="/leaderboard">Топ</a>
+			<a class="{{if eq .Active "admin"}}active{{end}}" href="/admin">Админка</a>
+		</nav>
+	</header>
+	<main class="shell">
+		{{template "content" .}}
+	</main>
+	<script src="/static/app.js"></script>
+</body>
+</html>
+{{end}}

@@ -1,0 +1,75 @@
+{{define "content"}}
+<div class="page-head">
+	<p class="eyebrow">Наполнение базы</p>
+	<h1>Админка</h1>
+	{{if .Message}}<p class="notice">Сохранено: {{.Message}}</p>{{end}}
+</div>
+<section class="stats compact">
+	<div><strong>{{index .Stats "topics"}}</strong><span>тем</span></div>
+	<div><strong>{{index .Stats "theory_items"}}</strong><span>элементов теории</span></div>
+	<div><strong>{{index .Stats "questions"}}</strong><span>вопросов</span></div>
+	<div><strong>{{index .Stats "attempts"}}</strong><span>проверок</span></div>
+</section>
+<section class="admin-grid">
+	<form class="panel form-panel" method="post" action="/admin/topics">
+		<h2>Тема</h2>
+		<input name="title" placeholder="Название" required>
+		<input name="chapter" placeholder="Раздел">
+		<textarea name="description" rows="3" placeholder="Описание"></textarea>
+		<input name="difficulty" type="number" min="1" max="5" value="1">
+		<button class="button primary">Добавить тему</button>
+	</form>
+
+	<form class="panel form-panel" method="post" action="/admin/theory">
+		<h2>Теория</h2>
+		<select name="topic_id" required>{{range .Topics}}<option value="{{.ID}}">{{.Title}}</option>{{end}}</select>
+		<select name="type"><option value="definition">definition</option><option value="theorem">theorem</option><option value="criterion">criterion</option><option value="property">property</option><option value="example">example</option><option value="proof">proof</option></select>
+		<input name="title" placeholder="Название" required>
+		<textarea name="statement" rows="3" placeholder="Формулировка"></textarea>
+		<textarea name="explanation" rows="3" placeholder="Пояснение"></textarea>
+		<textarea name="proof_outline" rows="3" placeholder="Краткий план доказательства"></textarea>
+		<textarea name="proof_full" rows="4" placeholder="Полное доказательство"></textarea>
+		<input name="source_page" type="number" min="0" placeholder="Страница учебника">
+		<button class="button primary">Добавить теорию</button>
+	</form>
+
+	<form class="panel form-panel" method="post" action="/admin/cards">
+		<h2>Карточка</h2>
+		<select name="topic_id" required>{{range .Topics}}<option value="{{.ID}}">{{.Title}}</option>{{end}}</select>
+		<select name="theory_item_id"><option value="0">Без привязки</option>{{range .Items}}<option value="{{.ID}}">{{.Title}}</option>{{end}}</select>
+		<select name="type"><option value="definition">definition</option><option value="theorem">theorem</option><option value="criterion">criterion</option><option value="formula">formula</option><option value="proof_outline">proof_outline</option></select>
+		<textarea name="front" rows="2" placeholder="Лицевая сторона" required></textarea>
+		<textarea name="back" rows="4" placeholder="Ответ" required></textarea>
+		<input name="hint" placeholder="Ключевые слова">
+		<input name="difficulty" type="number" min="1" max="5" value="1">
+		<button class="button primary">Добавить карточку</button>
+	</form>
+
+	<form class="panel form-panel" method="post" action="/admin/questions">
+		<h2>Вопрос</h2>
+		<select name="topic_id" required>{{range .Topics}}<option value="{{.ID}}">{{.Title}}</option>{{end}}</select>
+		<select name="theory_item_id"><option value="0">Без привязки</option>{{range .Items}}<option value="{{.ID}}">{{.Title}}</option>{{end}}</select>
+		<select name="type"><option value="prove">prove</option><option value="derive">derive</option><option value="explain">explain</option><option value="example">example</option><option value="true_false">true_false</option><option value="formulate">formulate</option><option value="oral">oral</option></select>
+		<select name="exam_kind"><option value="theory">theory</option><option value="ikr">ikr</option><option value="tkr">tkr</option></select>
+		<textarea name="text" rows="2" placeholder="Текст вопроса" required></textarea>
+		<textarea name="expected_answer" rows="4" placeholder="Эталон ответа"></textarea>
+		<input name="short_answer" placeholder="Краткий ответ">
+		<input name="tags" value="oral,variant" placeholder="tags через запятую">
+		<input name="difficulty" type="number" min="1" max="5" value="1">
+		<button class="button primary">Добавить вопрос</button>
+	</form>
+
+	<form class="panel form-panel" method="post" action="/admin/proof-games">
+		<h2>Игра доказательства</h2>
+		<select name="theory_item_id" required>{{range .Items}}<option value="{{.ID}}">{{.Title}}</option>{{end}}</select>
+		<textarea name="question" rows="2" placeholder="Вопрос" required></textarea>
+		<textarea name="correct_outline" rows="3" placeholder="Правильный план" required></textarea>
+		<textarea name="wrong_outline_1" rows="2" placeholder="Неверный план 1" required></textarea>
+		<textarea name="wrong_outline_2" rows="2" placeholder="Неверный план 2" required></textarea>
+		<textarea name="wrong_outline_3" rows="2" placeholder="Неверный план 3" required></textarea>
+		<textarea name="explanation" rows="3" placeholder="Объяснение"></textarea>
+		<button class="button primary">Добавить игру</button>
+	</form>
+</section>
+{{end}}
+{{template "layout" .}}

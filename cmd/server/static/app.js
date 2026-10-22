@@ -1,0 +1,43 @@
+document.querySelectorAll("[data-show-answer]").forEach((button) => {
+	button.addEventListener("click", () => {
+		const card = button.closest("[data-flip-card]");
+		card.querySelector(".front").classList.add("hidden");
+		card.querySelector(".back").classList.remove("hidden");
+	});
+});
+
+document.querySelectorAll("[data-toggle]").forEach((button) => {
+	button.addEventListener("click", () => {
+		const target = document.querySelector(button.dataset.toggle);
+		if (target) target.classList.toggle("hidden");
+	});
+});
+
+document.querySelectorAll("[data-proof-game]").forEach((game) => {
+	const result = game.querySelector("[data-proof-result]");
+	game.querySelectorAll(".choice").forEach((choice) => {
+		choice.addEventListener("click", () => {
+			game.querySelectorAll(".choice").forEach((item) => {
+				item.disabled = true;
+				if (item.dataset.correct === "true") item.classList.add("correct");
+			});
+			if (choice.dataset.correct !== "true") choice.classList.add("wrong");
+			result.classList.remove("hidden");
+		});
+	});
+});
+
+document.querySelectorAll("[data-timer]").forEach((timer) => {
+	let seconds = Number(timer.dataset.timer || 0);
+	const render = () => {
+		const minutes = Math.floor(seconds / 60).toString().padStart(2, "0");
+		const rest = (seconds % 60).toString().padStart(2, "0");
+		timer.textContent = `${minutes}:${rest}`;
+	};
+	render();
+	const interval = window.setInterval(() => {
+		seconds -= 1;
+		render();
+		if (seconds <= 0) window.clearInterval(interval);
+	}, 1000);
+});
