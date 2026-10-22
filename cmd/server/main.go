@@ -175,7 +175,14 @@ func main() {
 	mux.HandleFunc("POST /admin/questions", app.createQuestion)
 	mux.HandleFunc("POST /admin/proof-games", app.createProofGame)
 
-	addr := ":8080"
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	if !strings.HasPrefix(port, ":") {
+		port = ":" + port
+	}
+	addr := port
 	log.Printf("matan trainer listening on http://localhost%s", addr)
 	log.Fatal(http.ListenAndServe(addr, mux))
 }

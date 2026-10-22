@@ -59,6 +59,26 @@ postgres://postgres:postgres@localhost:5544/matan_trainer?sslmode=disable
 тем, теорию, карточки, вопросы и варианты. Повторный запуск идемпотентен: уже
 сохранённые попытки не удаляются.
 
+## Публичный запуск: Render + Supabase
+
+Проект подготовлен для бесплатного размещения на Render с PostgreSQL-базой в
+Supabase. Render собирает приложение из GitHub, а `render.yaml` задаёт команду
+сборки, запуск и health check.
+
+1. Создайте проект в [Supabase](https://supabase.com/dashboard).
+2. Откройте `Connect` → `Connection string` → `URI` и скопируйте строку
+   подключения PostgreSQL.
+3. В Render выберите `New` → `Blueprint` и подключите репозиторий
+   `Mamkinhecker/matan`.
+4. В настройках сервиса добавьте секрет `DATABASE_URL` со строкой Supabase.
+5. Запустите deploy и откройте выданный Render URL.
+
+Схема и начальное наполнение создаются самим приложением при первом запуске.
+Не добавляйте строку подключения в git: локальные значения храните в `.env`, а
+для примера используйте `.env.example`. Бесплатный проект Supabase рассчитан
+на небольшой учебный проект и может приостанавливаться после длительного
+бездействия, поэтому перед важным обновлением делайте экспорт базы.
+
 Остановить PostgreSQL:
 
 ```sh
@@ -114,6 +134,9 @@ docker compose down -v
 │   └── static/               CSS и JavaScript
 ├── cmd/pdfextract/          извлечение текста из учебников
 ├── docker-compose.yml        PostgreSQL 16
+├── Dockerfile                production-сборка для Render
+├── render.yaml               конфигурация бесплатного Render Web Service
+├── .env.example              пример переменных окружения
 ├── Makefile                  команды запуска и проверки
 ├── Levakov1.pdf             источник материалов курса
 └── учебник.pdf              источник материалов курса

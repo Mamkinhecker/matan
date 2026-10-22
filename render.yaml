@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: matan-trainer
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: GOCACHE
+        value: /tmp/go-cache
