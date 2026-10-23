@@ -387,6 +387,11 @@ func TestAnonymousNavigationStartsWithAuthLinksAndThemeToggle(t *testing.T) {
 	if navStart, themeToggle := strings.Index(body, `<nav class="nav"`), strings.Index(body, `data-theme-toggle`); navStart < 0 || themeToggle > navStart {
 		t.Error("theme toggle should sit outside and before the primary navigation")
 	}
+	for _, group := range []string{"Учёба", "Практика", "Мой прогресс"} {
+		if !strings.Contains(body, "<summary>"+group+"</summary>") {
+			t.Errorf("navigation is missing the %q group", group)
+		}
+	}
 }
 
 func TestCuratedExtraTasksHaveCompleteSolutions(t *testing.T) {

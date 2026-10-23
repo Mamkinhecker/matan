@@ -11,7 +11,7 @@
 			document.documentElement.dataset.theme = "dark";
 		}
 	</script>
-	<link rel="stylesheet" href="/static/styles.css?v=4">
+	<link rel="stylesheet" href="/static/styles.css?v=5">
 	<script>window.MathJax = {tex: {inlineMath: [['\\(', '\\)'], ['$', '$']]}, svg: {fontCache: 'global'}};</script>
 	<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
 </head>
@@ -33,19 +33,34 @@
 			<a class="{{if eq .Active "auth"}}active{{end}}" href="/login">Войти</a>
 			<a href="/register">Регистрация</a>
 			{{end}}
-			<a class="{{if eq .Active "topics"}}active{{end}}" href="/topics">Темы</a>
-			<a class="{{if eq .Active "cards"}}active{{end}}" href="/cards">Карточки</a>
-			<a class="{{if eq .Active "formulations"}}active{{end}}" href="/formulations">Формулировки</a>
-			<a class="{{if eq .Active "proof-game"}}active{{end}}" href="/proof-game">Доказательства</a>
-			<a class="{{if eq .Active "oral"}}active{{end}}" href="/oral">Устный</a>
-			<a class="{{if eq .Active "variant"}}active{{end}}" href="/variant">Вариант</a>
-			<a class="{{if eq .Active "practice"}}active{{end}}" href="/practice">Тренировка</a>
-			<a class="{{if eq .Active "theory-test"}}active{{end}}" href="/theory-test">Теория</a>
-			<a class="{{if eq .Active "ikr"}}active{{end}}" href="/ikr">ИКР</a>
-			<a class="{{if eq .Active "tkr"}}active{{end}}" href="/tkr">ТКР</a>
-			<a class="{{if eq .Active "progress"}}active{{end}}" href="/progress">Прогресс</a>
-			<a class="{{if eq .Active "review"}}active{{end}}" href="/review">Повторить сложное</a>
-			<a class="{{if eq .Active "leaderboard"}}active{{end}}" href="/leaderboard">Топ</a>
+			<details class="nav-group" {{if or (eq .Active "topics") (eq .Active "cards") (eq .Active "formulations")}}open{{end}}>
+				<summary>Учёба</summary>
+				<div class="nav-group-links">
+					<a class="{{if eq .Active "topics"}}active{{end}}" href="/topics">Темы</a>
+					<a class="{{if eq .Active "cards"}}active{{end}}" href="/cards">Карточки</a>
+					<a class="{{if eq .Active "formulations"}}active{{end}}" href="/formulations">Формулировки</a>
+				</div>
+			</details>
+			<details class="nav-group" {{if or (eq .Active "practice") (eq .Active "variant") (eq .Active "proof-game") (eq .Active "oral") (eq .Active "theory-test") (eq .Active "ikr") (eq .Active "tkr")}}open{{end}}>
+				<summary>Практика</summary>
+				<div class="nav-group-links">
+					<a class="{{if eq .Active "practice"}}active{{end}}" href="/practice">Тренировка</a>
+					<a class="{{if eq .Active "variant"}}active{{end}}" href="/variant">Вариант</a>
+					<a class="{{if eq .Active "proof-game"}}active{{end}}" href="/proof-game">Доказательства</a>
+					<a class="{{if eq .Active "oral"}}active{{end}}" href="/oral">Устный</a>
+					<a class="{{if eq .Active "theory-test"}}active{{end}}" href="/theory-test">Теория</a>
+					<a class="{{if eq .Active "ikr"}}active{{end}}" href="/ikr">ИКР</a>
+					<a class="{{if eq .Active "tkr"}}active{{end}}" href="/tkr">ТКР</a>
+				</div>
+			</details>
+			<details class="nav-group" {{if or (eq .Active "progress") (eq .Active "review") (eq .Active "leaderboard")}}open{{end}}>
+				<summary>Мой прогресс</summary>
+				<div class="nav-group-links">
+					<a class="{{if eq .Active "progress"}}active{{end}}" href="/progress">Прогресс</a>
+					<a class="{{if eq .Active "review"}}active{{end}}" href="/review">Повторить сложное</a>
+					<a class="{{if eq .Active "leaderboard"}}active{{end}}" href="/leaderboard">Топ</a>
+				</div>
+			</details>
 			{{if .IsAdmin}}<a class="{{if eq .Active "admin"}}active{{end}}" href="/admin">Админка</a>{{end}}
 			{{if .CurrentUser}}
 			<span class="nav-user">{{.CurrentUser}}</span>
@@ -56,7 +71,7 @@
 	<main class="shell">
 		{{template "content" .}}
 	</main>
-	<script src="/static/app.js?v=4"></script>
+	<script src="/static/app.js?v=5"></script>
 </body>
 </html>
 {{end}}

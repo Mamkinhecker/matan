@@ -884,7 +884,7 @@ th {
 }
 
 .design-new .nav {
-	flex: 1 1 700px;
+	flex: 1 1 auto;
 	align-items: center;
 	justify-content: center;
 	gap: 4px;
@@ -905,6 +905,72 @@ th {
 
 .design-new .nav a:hover,
 .design-new .nav a.active {
+	background: var(--soft-green);
+	color: var(--ink);
+}
+
+.design-new .nav-group {
+	position: relative;
+	font: 700 13px ui-sans-serif, system-ui, sans-serif;
+}
+
+.design-new .nav-group > summary {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	padding: 8px 10px;
+	border-radius: 9px;
+	color: var(--muted);
+	cursor: pointer;
+	list-style: none;
+	white-space: nowrap;
+}
+
+.design-new .nav-group > summary::-webkit-details-marker {
+	display: none;
+}
+
+.design-new .nav-group > summary::after {
+	width: 7px;
+	height: 7px;
+	border-right: 1.5px solid currentColor;
+	border-bottom: 1.5px solid currentColor;
+	content: "";
+	transform: translateY(-2px) rotate(45deg);
+	transition: transform 120ms ease;
+}
+
+.design-new .nav-group[open] > summary::after {
+	transform: translateY(2px) rotate(225deg);
+}
+
+.design-new .nav-group > summary:hover,
+.design-new .nav-group[open] > summary {
+	background: var(--soft-green);
+	color: var(--ink);
+}
+
+.design-new .nav-group-links {
+	position: absolute;
+	top: calc(100% + 8px);
+	left: 0;
+	z-index: 6;
+	display: grid;
+	min-width: 200px;
+	gap: 3px;
+	padding: 8px;
+	border: 2px solid var(--ink);
+	border-radius: 12px;
+	background: var(--paper);
+	box-shadow: var(--shadow);
+}
+
+.design-new .nav-group-links a {
+	color: var(--ink);
+}
+
+.design-new .nav-group-links a:hover,
+.design-new .nav-group-links a.active {
 	background: var(--soft-green);
 	color: var(--ink);
 }
@@ -1229,6 +1295,41 @@ th {
 
 	.design-new .nav a {
 		color: var(--ink);
+	}
+
+	.design-new .nav-group {
+		width: 100%;
+	}
+
+	.design-new .nav-group > summary {
+		justify-content: space-between;
+		padding: 12px;
+		color: var(--ink);
+		font-size: 16px;
+	}
+
+	.design-new .nav-group-links {
+		position: static;
+		min-width: 0;
+		gap: 2px;
+		margin: 2px 0 8px 10px;
+		padding: 4px 0 4px 8px;
+		border: 0;
+		border-left: 2px solid var(--line);
+		border-radius: 0;
+		background: transparent;
+		box-shadow: none;
+	}
+
+	.design-new .nav-group-links a {
+		padding: 10px 12px;
+	}
+
+	.design-new .nav-group > summary:hover,
+	.design-new .nav-group[open] > summary,
+	.design-new .nav-group-links a:hover,
+	.design-new .nav-group-links a.active {
+		background: var(--soft-green);
 	}
 
 	.design-new .nav a:hover,

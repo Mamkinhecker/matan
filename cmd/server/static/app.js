@@ -115,3 +115,12 @@ if (menuToggle && siteNav && navBackdrop) {
 	mobileMenu.addEventListener("change", () => setMenuOpen(false));
 	setMenuOpen(false);
 }
+
+document.querySelectorAll(".nav-group").forEach((group) => {
+	group.addEventListener("toggle", () => {
+		if (!group.open) return;
+		document.querySelectorAll(".nav-group").forEach((otherGroup) => {
+			if (otherGroup !== group) otherGroup.open = false;
+		});
+	});
+});
