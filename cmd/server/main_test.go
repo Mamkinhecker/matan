@@ -34,6 +34,51 @@ func TestValidateAnswerGivesNextStep(t *testing.T) {
 	}
 }
 
+func TestValidateAnswerRejectsEmptyAnswer(t *testing.T) {
+	grade, feedback := validateAnswer(" \n\t", "предел + значение", "Полный ответ")
+	if grade != "bad" || feedback == "" {
+		t.Fatalf("expected empty answer to be rejected with feedback, got grade=%q feedback=%q", grade, feedback)
+	}
+}
+
+func TestParseIssuedExamIDs(t *testing.T) {
+	tests := []struct {
+		name      string
+		submitted []string
+		issued    []int64
+		wantErr   bool
+	}{
+		{name: "same set", submitted: []string{"7", "8"}, issued: []int64{8, 7}},
+		{name: "duplicate", submitted: []string{"7", "7"}, issued: []int64{7, 8}, wantErr: true},
+		{name: "unissued id", submitted: []string{"7", "9"}, issued: []int64{7, 8}, wantErr: true},
+		{name: "missing id", submitted: []string{"7"}, issued: []int64{7, 8}, wantErr: true},
+		{name: "invalid id", submitted: []string{"0"}, issued: []int64{7}, wantErr: true},
+		{name: "duplicate issued id", submitted: []string{"7", "8"}, issued: []int64{7, 7}, wantErr: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := parseIssuedExamIDs(test.submitted, test.issued)
+			if (err != nil) != test.wantErr {
+				t.Fatalf("parseIssuedExamIDs() error = %v, wantErr %v", err, test.wantErr)
+			}
+			if err == nil && len(got) != len(test.submitted) {
+				t.Fatalf("got %d parsed ids, want %d", len(got), len(test.submitted))
+			}
+		})
+	}
+}
+
+func TestValidExamRunID(t *testing.T) {
+	if !validExamRunID(strings.Repeat("a1", 32)) {
+		t.Fatal("valid 32-byte hex exam run ID rejected")
+	}
+	for _, id := range []string{"", strings.Repeat("g", 64), strings.Repeat("a", 63)} {
+		if validExamRunID(id) {
+			t.Errorf("invalid exam run ID accepted: %q", id)
+		}
+	}
+}
+
 func TestValidUsername(t *testing.T) {
 	for _, username := range []string{"alex", "student_7", "user-name"} {
 		if !validUsername(username) {
@@ -264,6 +309,41 @@ func TestCardsPageRendersGroupedCardsWithCSRFToken(t *testing.T) {
 	}
 }
 
+func TestPracticeAndAnonymousExamTemplatesRender(t *testing.T) {
+	tests := []struct {
+		name     string
+		data     PageData
+		contains string
+	}{
+		{
+			name:     "practice.html",
+			data:     PageData{Title: "Настроить тренировку"},
+			contains: "Сформировать вариант",
+		},
+		{
+			name: "variant.html",
+			data: PageData{
+				Title: "Экзамен", VariantTitle: "Экзамен", IsExam: true, ExamMinutes: 45,
+				Questions: []Question{{ID: 1, Text: "Задание"}},
+			},
+			contains: "попытка сохранится в прогрессе только после авторизации",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest("GET", "/", nil)
+			(&App{}).render(recorder, request, test.name, test.data)
+			if recorder.Code != http.StatusOK {
+				t.Fatalf("render status = %d: %s", recorder.Code, recorder.Body.String())
+			}
+			if !strings.Contains(recorder.Body.String(), test.contains) {
+				t.Errorf("rendered page does not contain %q", test.contains)
+			}
+		})
+	}
+}
+
 func TestHomeUsesNewBrandWithoutIntroductoryProjectCopy(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest("GET", "/", nil)
@@ -275,7 +355,7 @@ func TestHomeUsesNewBrandWithoutIntroductoryProjectCopy(t *testing.T) {
 		t.Fatalf("render status = %d: %s", recorder.Code, recorder.Body.String())
 	}
 	body := recorder.Body.String()
-	for _, expected := range []string{"Matan FAMCS", "Старый дизайн", "design-new"} {
+	for _, expected := range []string{"Matan FAMCS", "Настроить тренировку", "Повторить сложное", "design-new"} {
 		if !strings.Contains(body, expected) {
 			t.Errorf("home page does not contain %q", expected)
 		}
@@ -284,5 +364,68 @@ func TestHomeUsesNewBrandWithoutIntroductoryProjectCopy(t *testing.T) {
 		if strings.Contains(body, removed) {
 			t.Errorf("home page still contains removed project intro %q", removed)
 		}
+	}
+}
+
+func TestCuratedExtraTasksHaveCompleteSolutions(t *testing.T) {
+	if len(curatedExtraTasks) != 30 {
+		t.Fatalf("curated extra task count = %d, want 30", len(curatedExtraTasks))
+	}
+	seen := make(map[string]bool, len(curatedExtraTasks))
+	topics := make(map[string]map[string]int)
+	for _, task := range curatedExtraTasks {
+		if task.topic == "" || task.text == "" || task.answer == "" || task.short == "" {
+			t.Errorf("incomplete task data: %#v", task)
+		}
+		if task.kind != "ikr" && task.kind != "tkr" {
+			t.Errorf("unexpected task kind %q", task.kind)
+		}
+		wantType := map[string]string{"ikr": "explain", "tkr": "prove"}[task.kind]
+		if got := curatedQuestionType(task.kind); got != wantType {
+			t.Errorf("question type for kind %q = %q, want %q", task.kind, got, wantType)
+		}
+		if topics[task.topic] == nil {
+			topics[task.topic] = make(map[string]int)
+		}
+		topics[task.topic][task.kind]++
+		if seen[task.text] {
+			t.Errorf("duplicate task text %q", task.text)
+		}
+		seen[task.text] = true
+		if len([]rune(task.answer)) < 200 {
+			t.Errorf("solution for %q is too short to be a complete derivation", task.text)
+		}
+		if !strings.Contains(task.answer, ".") {
+			t.Errorf("solution for %q does not contain a complete sentence", task.text)
+		}
+	}
+	if len(topics) != 15 {
+		t.Errorf("extra tasks cover %d topics, want 15", len(topics))
+	}
+	for topic, kinds := range topics {
+		if kinds["ikr"] != 1 || kinds["tkr"] != 1 {
+			t.Errorf("topic %q has IKR/TKR counts %d/%d, want 1/1", topic, kinds["ikr"], kinds["tkr"])
+		}
+	}
+	if curatedQuestionType("invalid") != "" {
+		t.Error("unsupported task kind must not map to a database question type")
+	}
+}
+
+func TestPracticeParameterHelpers(t *testing.T) {
+	if got := validPracticeKind("ikr"); got != "ikr" {
+		t.Errorf("validPracticeKind(ikr) = %q", got)
+	}
+	if got := validPracticeKind("arbitrary"); got != "" {
+		t.Errorf("validPracticeKind(arbitrary) = %q, want empty", got)
+	}
+	if got := clampInt(99, 3, 20); got != 20 {
+		t.Errorf("clampInt high = %d, want 20", got)
+	}
+	if got := clampInt(1, 3, 20); got != 3 {
+		t.Errorf("clampInt low = %d, want 3", got)
+	}
+	if got := buildPracticeURL(2, "ikr", 5, 4, 10, true, 60); got != "/variant?count=10&difficulty=4&exam=1&kind=ikr&minutes=60&semester=2&topic=5" {
+		t.Errorf("buildPracticeURL = %q", got)
 	}
 }

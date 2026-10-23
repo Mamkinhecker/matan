@@ -42,6 +42,26 @@ document.querySelectorAll("[data-timer]").forEach((timer) => {
 	}, 1000);
 });
 
+document.querySelectorAll("[data-exam-timer]").forEach((timer) => {
+	const form = document.querySelector("[data-exam-form]");
+	let seconds = Number(timer.dataset.examTimer || 0);
+	const render = () => {
+		const minutes = Math.floor(seconds / 60).toString().padStart(2, "0");
+		const rest = (seconds % 60).toString().padStart(2, "0");
+		timer.textContent = `${minutes}:${rest}`;
+		timer.classList.toggle("time-low", seconds <= 300);
+	};
+	render();
+	const interval = window.setInterval(() => {
+		seconds -= 1;
+		render();
+		if (seconds <= 0) {
+			window.clearInterval(interval);
+			if (form) form.requestSubmit();
+		}
+	}, 1000);
+});
+
 const menuToggle = document.querySelector(".menu-toggle");
 const siteNav = document.querySelector("#site-nav");
 const navBackdrop = document.querySelector(".nav-backdrop");
@@ -70,25 +90,4 @@ if (menuToggle && siteNav && navBackdrop) {
 	});
 	mobileMenu.addEventListener("change", () => setMenuOpen(false));
 	setMenuOpen(false);
-}
-
-const designToggle = document.querySelector("[data-design-toggle]");
-if (designToggle) {
-	const updateDesignLabel = () => {
-		const isNewDesign = document.documentElement.classList.contains("design-new");
-		designToggle.textContent = isNewDesign ? "Старый дизайн" : "Новый дизайн";
-		designToggle.setAttribute("aria-pressed", String(!isNewDesign));
-	};
-
-	designToggle.addEventListener("click", () => {
-		const useNewDesign = !document.documentElement.classList.contains("design-new");
-		document.documentElement.classList.toggle("design-new", useNewDesign);
-		try {
-			localStorage.setItem("matan-design", useNewDesign ? "new" : "classic");
-		} catch (_) {
-			// The selection still applies for this page if storage is unavailable.
-		}
-		updateDesignLabel();
-	});
-	updateDesignLabel();
 }

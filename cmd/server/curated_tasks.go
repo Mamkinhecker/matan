@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -547,7 +548,7 @@ func curatedSpecForByChapter(title string) (curatedTaskSpec, bool) {
 	}
 }
 
-func seedCuratedContent(ctx context.Context, db *pgxpool.Pool) error {
+func seedCuratedContent(ctx context.Context, db pgx.Tx) error {
 	if err := placeTopics(ctx, db); err != nil {
 		return err
 	}
@@ -573,15 +574,7 @@ func seedCuratedContent(ctx context.Context, db *pgxpool.Pool) error {
 		return err
 	}
 
-	// Legacy rows are retained for existing attempts and for manual recovery.
-	// Only the bank owned by this seeder is refreshed.
-	if _, err := db.Exec(ctx, `delete from questions where source = 'curated'`); err != nil {
-		return err
-	}
-	if _, err := db.Exec(ctx, `delete from proof_choice_games where source = 'curated'`); err != nil {
-		return err
-	}
-
+	// Keep seeded row IDs stable because attempts store question IDs directly.
 	for _, topic := range topics {
 		spec, ok := curatedSpecFor(topic.title)
 		if !ok {
@@ -610,6 +603,10 @@ func seedCuratedContent(ctx context.Context, db *pgxpool.Pool) error {
 			insert into proof_choice_games
 				(theory_item_id, question, correct_outline, wrong_outline_1, wrong_outline_2, wrong_outline_3, explanation, source)
 			values ($1, $2, $3, $4, $5, $6, $7, 'curated')
+			on conflict (question) do update set theory_item_id = excluded.theory_item_id,
+				correct_outline = excluded.correct_outline, wrong_outline_1 = excluded.wrong_outline_1,
+				wrong_outline_2 = excluded.wrong_outline_2, wrong_outline_3 = excluded.wrong_outline_3,
+				explanation = excluded.explanation, source = excluded.source
 		`, theoryItemID,
 			"Выбери строгую схему доказательства по теме «"+topic.title+"»: "+spec.TKR,
 			"1) Проверить условия утверждения. 2) Ввести обозначения и свести задачу к определению или ранее доказанной теореме. 3) Выполнить все переходы с обоснованием. 4) Вернуться к исходным данным и записать вывод.",
@@ -633,9 +630,10 @@ func seedCuratedContent(ctx context.Context, db *pgxpool.Pool) error {
 			if _, err := db.Exec(ctx, `
 				insert into questions (topic_id, theory_item_id, type, exam_kind, text, expected_answer, short_answer, difficulty, tags, source)
 				values ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'curated')
-				on conflict (text) do update set expected_answer = excluded.expected_answer,
-				short_answer = excluded.short_answer, theory_item_id = excluded.theory_item_id,
-				 source = excluded.source
+				on conflict (text) do update set topic_id = excluded.topic_id,
+					theory_item_id = excluded.theory_item_id, type = excluded.type, exam_kind = excluded.exam_kind,
+					expected_answer = excluded.expected_answer, short_answer = excluded.short_answer,
+					difficulty = excluded.difficulty, tags = excluded.tags, source = excluded.source
 			`, topic.id, theoryItemID, question.typ, question.examKind, question.text, question.answer, question.short, question.difficulty, question.tags); err != nil {
 				return err
 			}
@@ -644,7 +642,7 @@ func seedCuratedContent(ctx context.Context, db *pgxpool.Pool) error {
 	return nil
 }
 
-func placeTopics(ctx context.Context, db *pgxpool.Pool) error {
+func placeTopics(ctx context.Context, db pgx.Tx) error {
 	for order, title := range courseTopicOrder {
 		semester := 1
 		if secondSemesterTopics[title] {
@@ -655,6 +653,28 @@ func placeTopics(ctx context.Context, db *pgxpool.Pool) error {
 		`, semester, order+1, title); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func seedCuratedCatalog(ctx context.Context, db *pgxpool.Pool) error {
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin curated catalog seed: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	if err := seedCuratedContent(ctx, tx); err != nil {
+		return fmt.Errorf("seed base curated content: %w", err)
+	}
+	if err := seedCuratedExtraTasks(ctx, tx); err != nil {
+		return fmt.Errorf("seed extra curated tasks: %w", err)
+	}
+	if err := seedCuratedSecondTasks(ctx, tx); err != nil {
+		return fmt.Errorf("seed additional curated tasks: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit curated catalog seed: %w", err)
 	}
 	return nil
 }

@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	cryptorand "crypto/rand"
 	"embed"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"html/template"
@@ -15,9 +17,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+const examSubmissionGrace = 15 * time.Second
 
 //go:embed templates/*.html static/*
 var assets embed.FS
@@ -124,30 +129,42 @@ type LeaderRow struct {
 }
 
 type PageData struct {
-	Title            string
-	Active           string
-	Message          string
-	Stats            map[string]int
-	Topics           []Topic
-	Items            []TheoryItem
-	Topic            Topic
-	Cards            []Card
-	CardGroups       []CardSemesterGroup
-	Card             Card
-	Questions        []Question
-	Question         Question
-	Game             ProofChoice
-	Progress         []ProgressRow
-	Leaderboard      []LeaderRow
-	VariantTitle     string
-	SearchQuery      string
-	SelectedTopic    string
-	SelectedSemester int
-	CurrentUser      string
-	IsAdmin          bool
-	AuthMode         string
-	Next             string
-	CSRFToken        string
+	Title              string
+	Active             string
+	Message            string
+	Stats              map[string]int
+	Topics             []Topic
+	Items              []TheoryItem
+	Topic              Topic
+	Cards              []Card
+	CardGroups         []CardSemesterGroup
+	Card               Card
+	Questions          []Question
+	Question           Question
+	Game               ProofChoice
+	Progress           []ProgressRow
+	Leaderboard        []LeaderRow
+	VariantTitle       string
+	SearchQuery        string
+	SelectedTopic      string
+	SelectedSemester   int
+	SelectedKind       string
+	SelectedDifficulty int
+	QuestionCount      int
+	IsExam             bool
+	ExamMinutes        int
+	ExamSubmitted      bool
+	ExamScore          int
+	ExamMaximum        int
+	IsReview           bool
+	ExamRunID          string
+	ExamSecondsLeft    int
+	ReturnURL          string
+	CurrentUser        string
+	IsAdmin            bool
+	AuthMode           string
+	Next               string
+	CSRFToken          string
 }
 
 func main() {
@@ -201,6 +218,9 @@ func main() {
 	mux.HandleFunc("GET /proof-game", app.proofGame)
 	mux.HandleFunc("GET /oral", app.oral)
 	mux.HandleFunc("GET /variant", app.variant)
+	mux.HandleFunc("GET /practice", app.practiceSetup)
+	mux.HandleFunc("POST /exam/submit", app.submitExam)
+	mux.HandleFunc("GET /review", app.review)
 	mux.HandleFunc("GET /theory-test", app.theoryTest)
 	mux.HandleFunc("GET /ikr", app.ikr)
 	mux.HandleFunc("GET /tkr", app.tkr)
@@ -236,6 +256,9 @@ func (a *App) render(w http.ResponseWriter, r *http.Request, name string, data P
 	if data.CSRFToken == "" {
 		http.Error(w, "Не удалось подготовить защищённую форму.", http.StatusInternalServerError)
 		return
+	}
+	if data.ReturnURL == "" {
+		data.ReturnURL = "/variant"
 	}
 	tmpl, err := template.New(name).Funcs(templateFunctions()).ParseFS(assets, "templates/layout.html", "templates/"+name)
 	if err != nil {
@@ -337,42 +360,442 @@ func (a *App) oral(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) variant(w http.ResponseWriter, r *http.Request) {
 	semester := semesterParam(r)
-	questions, err := a.variantQuestions(r.Context(), "", 6, semester)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	a.render(w, r, "variant.html", PageData{Title: "Письменный вариант", Active: "variant", Questions: questions, VariantTitle: "Смешанный вариант · " + semesterTitle(semester)})
+	a.renderPractice(w, r, "", semester, 0, 0, false, 0, "Письменный вариант")
 }
 
 func (a *App) theoryTest(w http.ResponseWriter, r *http.Request) {
 	semester := semesterParam(r)
-	questions, err := a.variantQuestions(r.Context(), "theory", 8, semester)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	a.render(w, r, "variant.html", PageData{Title: "Тест по теории", Active: "theory-test", Questions: questions, VariantTitle: "Тест по теории · " + semesterTitle(semester)})
+	a.renderPractice(w, r, "theory", semester, 0, 0, false, 0, "Тест по теории")
 }
 
 func (a *App) ikr(w http.ResponseWriter, r *http.Request) {
 	semester := semesterParam(r)
-	questions, err := a.variantQuestions(r.Context(), "ikr", 6, semester)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	a.render(w, r, "variant.html", PageData{Title: "ИКР", Active: "ikr", Questions: questions, VariantTitle: "Вариант ИКР · " + semesterTitle(semester)})
+	a.renderPractice(w, r, "ikr", semester, 0, 0, false, 0, "ИКР")
 }
 
 func (a *App) tkr(w http.ResponseWriter, r *http.Request) {
 	semester := semesterParam(r)
-	questions, err := a.variantQuestions(r.Context(), "tkr", 6, semester)
+	a.renderPractice(w, r, "tkr", semester, 0, 0, false, 0, "ТКР")
+}
+
+func (a *App) practiceSetup(w http.ResponseWriter, r *http.Request) {
+	topics, err := a.listTopics(r.Context(), "")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	a.render(w, r, "variant.html", PageData{Title: "ТКР", Active: "tkr", Questions: questions, VariantTitle: "Вариант ТКР · " + semesterTitle(semester)})
+	a.render(w, r, "practice.html", PageData{Title: "Настроить тренировку", Active: "practice", Topics: topics})
+}
+
+func (a *App) renderPractice(w http.ResponseWriter, r *http.Request, kind string, semester, topicID, difficulty int, exam bool, minutes int, title string) {
+	count := clampInt(formIntFromQuery(r, "count", 6), 3, 20)
+	if kind == "theory" {
+		count = clampInt(formIntFromQuery(r, "count", 8), 3, 20)
+	}
+	if queryKind := r.URL.Query().Get("kind"); queryKind != "" {
+		kind = validPracticeKind(queryKind)
+	}
+	if queryTopic := r.URL.Query().Get("topic"); queryTopic != "" {
+		topicID, _ = strconv.Atoi(queryTopic)
+		if topicID < 0 {
+			topicID = 0
+		}
+	}
+	if r.URL.Query().Has("difficulty") {
+		difficulty = clampInt(formIntFromQuery(r, "difficulty", 0), 0, 5)
+	}
+	if r.URL.Query().Has("exam") {
+		exam = r.URL.Query().Get("exam") == "1"
+	}
+	if r.URL.Query().Has("minutes") {
+		minutes = clampInt(formIntFromQuery(r, "minutes", 45), 15, 180)
+	}
+	if minutes == 0 {
+		minutes = 45
+	}
+	examRunID := strings.TrimSpace(r.URL.Query().Get("exam_run"))
+	if examRunID != "" {
+		exam = true
+	}
+	if title == "Письменный вариант" && kind != "" {
+		title = map[string]string{"ikr": "ИКР", "tkr": "ТКР", "theory": "Тест по теории"}[kind]
+	}
+	var questions []Question
+	var err error
+	examSecondsLeft := 0
+	if exam {
+		if examRunID == "" {
+			questions, err = a.variantQuestions(r.Context(), kind, count, semester, topicID, difficulty, 0)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if len(questions) == 0 {
+				http.Error(w, "Для выбранных фильтров заданий не найдено. Измените тему, семестр или сложность.", http.StatusNotFound)
+				return
+			}
+			examRunID, err = createExamRun(r.Context(), a.db, questions, minutes)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			practiceURL, err := url.Parse(buildPracticeURL(semester, kind, topicID, difficulty, count, true, minutes))
+			if err != nil {
+				http.Error(w, "Не удалось подготовить экзаменационный вариант.", http.StatusInternalServerError)
+				return
+			}
+			values := practiceURL.Query()
+			values.Set("exam_run", examRunID)
+			practiceURL.RawQuery = values.Encode()
+			http.Redirect(w, r, practiceURL.String(), http.StatusSeeOther)
+			return
+		}
+		var issuedIDs []int64
+		var submitted, expired bool
+		err = a.db.QueryRow(r.Context(), `
+			select question_ids, submitted_at is not null,
+			       expires_at + ($2 * interval '1 second') <= clock_timestamp(),
+			       greatest(0, ceil(extract(epoch from expires_at - clock_timestamp())))::int
+			from exam_runs where id = $1
+		`, examRunID, int(examSubmissionGrace.Seconds())).Scan(&issuedIDs, &submitted, &expired, &examSecondsLeft)
+		if err != nil {
+			http.Error(w, "Экзаменационный вариант не найден. Создайте новый вариант.", http.StatusNotFound)
+			return
+		}
+		if submitted {
+			http.Error(w, "Этот экзамен уже сдан. Создайте новый вариант.", http.StatusGone)
+			return
+		}
+		if expired {
+			http.Error(w, "Время экзамена истекло. Создайте новый вариант.", http.StatusGone)
+			return
+		}
+		questions, err = loadIssuedExamQuestions(r.Context(), a.db, issuedIDs)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	} else {
+		questions, err = a.variantQuestions(r.Context(), kind, count, semester, topicID, difficulty, 0)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if len(questions) == 0 {
+			http.Error(w, "Для выбранных фильтров заданий не найдено. Измените тему, семестр или сложность.", http.StatusNotFound)
+			return
+		}
+	}
+	for index := range questions {
+		questions[index].StudentAnswer = ""
+	}
+	active := "variant"
+	if kind == "ikr" {
+		active = "ikr"
+	} else if kind == "tkr" {
+		active = "tkr"
+	} else if kind == "theory" {
+		active = "theory-test"
+	}
+	displayTitle := title + " · " + semesterTitle(semester)
+	if exam {
+		displayTitle += " · экзамен"
+	}
+	a.render(w, r, "variant.html", PageData{
+		Title: displayTitle, Active: active, Questions: questions, VariantTitle: displayTitle,
+		SelectedSemester: semester, SelectedTopic: strconv.Itoa(topicID), SelectedKind: kind,
+		SelectedDifficulty: difficulty, QuestionCount: len(questions), IsExam: exam, ExamMinutes: minutes,
+		ExamRunID: examRunID, ExamSecondsLeft: examSecondsLeft,
+		ReturnURL: buildPracticeURL(semester, kind, topicID, difficulty, count, exam, minutes),
+	})
+}
+
+func createExamRun(ctx context.Context, db *pgxpool.Pool, questions []Question, minutes int) (string, error) {
+	token := make([]byte, 32)
+	if _, err := cryptorand.Read(token); err != nil {
+		return "", fmt.Errorf("generate exam token: %w", err)
+	}
+	ids := make([]int64, len(questions))
+	for index, question := range questions {
+		ids[index] = int64(question.ID)
+	}
+	id := hex.EncodeToString(token)
+	if _, err := db.Exec(ctx, `delete from exam_runs where expires_at < now() - interval '1 day'`); err != nil {
+		return "", fmt.Errorf("clean expired exam runs: %w", err)
+	}
+	if _, err := db.Exec(ctx, `
+		insert into exam_runs (id, question_ids, expires_at)
+		values ($1, $2, now() + ($3 * interval '1 minute'))
+	`, id, ids, minutes); err != nil {
+		return "", fmt.Errorf("create exam run: %w", err)
+	}
+	return id, nil
+}
+
+func loadIssuedExamQuestions(ctx context.Context, db *pgxpool.Pool, ids []int64) ([]Question, error) {
+	if len(ids) == 0 || len(ids) > 20 {
+		return nil, fmt.Errorf("Некорректный экзаменационный вариант.")
+	}
+	questions := make([]Question, 0, len(ids))
+	for _, id := range ids {
+		var question Question
+		err := db.QueryRow(ctx, `
+			select q.id, q.topic_id, q.type, q.exam_kind, q.text, q.expected_answer,
+			       q.short_answer, q.difficulty, q.tags, t.title
+			from questions q join topics t on t.id = q.topic_id
+			where q.id = $1 and q.source = 'curated'
+		`, id).Scan(&question.ID, &question.TopicID, &question.Type, &question.ExamKind, &question.Text,
+			&question.ExpectedAnswer, &question.ShortAnswer, &question.Difficulty, &question.Tags, &question.TopicTitle)
+		if err != nil {
+			return nil, fmt.Errorf("load issued exam question %d: %w", id, err)
+		}
+		questions = append(questions, question)
+	}
+	return questions, nil
+}
+
+func buildPracticeURL(semester int, kind string, topicID, difficulty, count int, exam bool, minutes int) string {
+	values := url.Values{}
+	if semester != 0 {
+		values.Set("semester", strconv.Itoa(semester))
+	}
+	if kind != "" {
+		values.Set("kind", kind)
+	}
+	if topicID > 0 {
+		values.Set("topic", strconv.Itoa(topicID))
+	}
+	if difficulty > 0 {
+		values.Set("difficulty", strconv.Itoa(difficulty))
+	}
+	values.Set("count", strconv.Itoa(count))
+	if exam {
+		values.Set("exam", "1")
+		values.Set("minutes", strconv.Itoa(minutes))
+	}
+	return "/variant?" + values.Encode()
+}
+
+func formIntFromQuery(r *http.Request, name string, fallback int) int {
+	value, err := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get(name)))
+	if err != nil {
+		return fallback
+	}
+	return value
+}
+
+func clampInt(value, min, max int) int {
+	if value < min {
+		return min
+	}
+	if value > max {
+		return max
+	}
+	return value
+}
+
+func validPracticeKind(kind string) string {
+	switch kind {
+	case "ikr", "tkr", "theory":
+		return kind
+	default:
+		return ""
+	}
+}
+
+func (a *App) review(w http.ResponseWriter, r *http.Request) {
+	user, ok := currentUser(r)
+	if !ok {
+		http.Redirect(w, r, "/login?next=%2Freview", http.StatusSeeOther)
+		return
+	}
+	questions, err := a.reviewQuestions(r.Context(), user.ID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	a.render(w, r, "variant.html", PageData{
+		Title: "Повторить сложное", Active: "review", VariantTitle: "Повторить сложное",
+		Questions: questions, IsReview: true, ReturnURL: "/review",
+	})
+}
+
+func (a *App) reviewQuestions(ctx context.Context, userID int64) ([]Question, error) {
+	rows, err := a.db.Query(ctx, `
+		with latest as (
+			select distinct on (target_id) target_id, grade
+			from attempts
+			where demo_student_id = $1 and target_type = 'question'
+			order by target_id, created_at desc, id desc
+		)
+		select q.id, q.topic_id, coalesce(q.theory_item_id, 0), q.type, q.exam_kind, q.text,
+			q.expected_answer, q.short_answer, q.difficulty, q.tags, t.title
+		from latest l
+		join questions q on q.id = l.target_id
+		join topics t on t.id = q.topic_id
+		where l.grade in ('bad', 'almost')
+		order by t.semester, t.sort_order, q.difficulty desc, q.id
+		limit 20
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	questions := make([]Question, 0)
+	for rows.Next() {
+		var question Question
+		if err := rows.Scan(&question.ID, &question.TopicID, &question.TheoryItemID, &question.Type, &question.ExamKind, &question.Text, &question.ExpectedAnswer, &question.ShortAnswer, &question.Difficulty, &question.Tags, &question.TopicTitle); err != nil {
+			return nil, err
+		}
+		questions = append(questions, question)
+	}
+	return questions, rows.Err()
+}
+
+func (a *App) submitExam(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if !validCSRF(r) {
+		http.Error(w, "Форма устарела. Обновите страницу и попробуйте ещё раз.", http.StatusForbidden)
+		return
+	}
+	user, loggedIn := currentUser(r)
+	examRunID := strings.TrimSpace(r.FormValue("exam_run"))
+	if !validExamRunID(examRunID) {
+		http.Error(w, "Некорректный экзаменационный вариант.", http.StatusBadRequest)
+		return
+	}
+	ids := r.Form["question_id"]
+	if len(ids) == 0 || len(ids) > 20 {
+		http.Error(w, "Некорректный экзаменационный вариант.", http.StatusBadRequest)
+		return
+	}
+	tx, err := a.db.Begin(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer func() {
+		if err := tx.Rollback(context.Background()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
+			log.Printf("rollback exam attempt transaction: %v", err)
+		}
+	}()
+	var issuedIDs []int64
+	var submitted, expired bool
+	err = tx.QueryRow(r.Context(), `
+		select question_ids, submitted_at is not null,
+		       expires_at + ($2 * interval '1 second') <= clock_timestamp()
+		from exam_runs where id = $1
+		for update
+	`, examRunID, int(examSubmissionGrace.Seconds())).Scan(&issuedIDs, &submitted, &expired)
+	if errors.Is(err, pgx.ErrNoRows) {
+		http.Error(w, "Экзаменационный вариант не найден.", http.StatusBadRequest)
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if submitted {
+		http.Error(w, "Этот экзамен уже сдан.", http.StatusGone)
+		return
+	}
+	if expired {
+		http.Error(w, "Время экзамена истекло.", http.StatusGone)
+		return
+	}
+	parsedIDs, err := parseIssuedExamIDs(ids, issuedIDs)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	questions := make([]Question, 0, len(ids))
+	score := 0
+	maximum := 0
+	for index, id := range parsedIDs {
+		rawID := ids[index]
+		var question Question
+		err = tx.QueryRow(r.Context(), `
+			select q.id, q.topic_id, q.type, q.exam_kind, q.text, q.expected_answer, q.short_answer, t.title
+			from questions q join topics t on t.id = q.topic_id where q.id = $1 and q.source = 'curated'
+		`, id).Scan(&question.ID, &question.TopicID, &question.Type, &question.ExamKind, &question.Text, &question.ExpectedAnswer, &question.ShortAnswer, &question.TopicTitle)
+		if err != nil {
+			http.Error(w, "Не удалось загрузить задание экзамена.", http.StatusInternalServerError)
+			return
+		}
+		question.StudentAnswer = strings.TrimSpace(r.FormValue("answer_" + rawID))
+		grade, feedback := validateAnswer(question.StudentAnswer, question.ShortAnswer, question.ExpectedAnswer)
+		question.Feedback = feedback
+		questions = append(questions, question)
+		score += gradePoints(grade)
+		maximum += 4
+		if loggedIn {
+			if _, err := tx.Exec(r.Context(), `
+				insert into attempts (demo_student_id, target_type, target_id, mode, grade, student_answer, feedback, points)
+				values ($1, 'question', $2, 'variant', $3, $4, $5, $6)
+			`, user.ID, question.ID, grade, question.StudentAnswer, feedback, gradePoints(grade)); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+	}
+	if _, err := tx.Exec(r.Context(), `update exam_runs set submitted_at = now() where id = $1`, examRunID); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	a.render(w, r, "variant.html", PageData{
+		Title: "Результаты экзамена", Active: "variant", VariantTitle: "Результаты экзамена",
+		Questions: questions, ExamSubmitted: true, ExamScore: score, ExamMaximum: maximum,
+	})
+}
+
+func validExamRunID(id string) bool {
+	if len(id) != 64 {
+		return false
+	}
+	_, err := hex.DecodeString(id)
+	return err == nil
+}
+
+func parseIssuedExamIDs(rawIDs []string, issuedIDs []int64) ([]int64, error) {
+	if len(rawIDs) == 0 || len(rawIDs) > 20 || len(rawIDs) != len(issuedIDs) {
+		return nil, fmt.Errorf("Набор заданий не совпадает с выданным экзаменом.")
+	}
+	issued := make(map[int64]struct{}, len(issuedIDs))
+	for _, id := range issuedIDs {
+		if id < 1 {
+			return nil, fmt.Errorf("Некорректный выданный вариант.")
+		}
+		if _, duplicate := issued[id]; duplicate {
+			return nil, fmt.Errorf("Некорректный выданный вариант.")
+		}
+		issued[id] = struct{}{}
+	}
+	seen := make(map[int64]struct{}, len(rawIDs))
+	parsed := make([]int64, 0, len(rawIDs))
+	for _, raw := range rawIDs {
+		id, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || id < 1 {
+			return nil, fmt.Errorf("Некорректный номер задания.")
+		}
+		if _, duplicate := seen[id]; duplicate {
+			return nil, fmt.Errorf("В экзамене обнаружено повторяющееся задание.")
+		}
+		if _, valid := issued[id]; !valid {
+			return nil, fmt.Errorf("В экзамене есть задание, которого не было в выданном варианте.")
+		}
+		seen[id] = struct{}{}
+		parsed = append(parsed, id)
+	}
+	return parsed, nil
 }
 
 func (a *App) progress(w http.ResponseWriter, r *http.Request) {
@@ -491,6 +914,9 @@ func gradePoints(grade string) int {
 }
 
 func validateAnswer(answer, short, expected string) (string, string) {
+	if strings.TrimSpace(answer) == "" {
+		return "bad", "Ответ не дан. Сначала запиши решение, затем отправь его на проверку."
+	}
 	text := strings.ToLower(answer)
 	clean := strings.NewReplacer("+", " ", ",", " ", ".", " ", ":", " ", ";", " ", "(", " ", ")", " ").Replace(strings.ToLower(short))
 	stop := map[string]bool{"и": true, "или": true, "для": true, "при": true, "через": true, "это": true, "нужно": true, "если": true, "из": true, "по": true}
@@ -814,7 +1240,7 @@ func (a *App) randomQuestion(ctx context.Context, mode string) (Question, error)
 	return question, err
 }
 
-func (a *App) variantQuestions(ctx context.Context, examKind string, limit int, semester int) ([]Question, error) {
+func (a *App) variantQuestions(ctx context.Context, examKind string, limit int, semester, topicID, difficulty int, weakUserID int64) ([]Question, error) {
 	rows, err := a.db.Query(ctx, `
 		select id, topic_id, theory_item_id, type, exam_kind, text, expected_answer,
 		       short_answer, difficulty, tags, title
@@ -824,12 +1250,21 @@ func (a *App) variantQuestions(ctx context.Context, examKind string, limit int, 
 			       row_number() over (partition by q.topic_id order by random()) as topic_number
 			from questions q
 			join topics t on t.id = q.topic_id
-			where q.source = 'curated' and ($1 = '' or q.exam_kind = $1) and ($3 = 0 or t.semester = $3)
+			where q.source = 'curated' and ($1 = '' or q.exam_kind = $1)
+				and ($3 = 0 or t.semester = $3) and ($4 = 0 or q.topic_id = $4)
+				and ($5 = 0 or q.difficulty = $5)
+				and ($6 = 0 or q.id in (
+					select target_id from (
+						select distinct on (target_id) target_id, grade from attempts
+						where demo_student_id = $6 and target_type = 'question'
+						order by target_id, created_at desc, id desc
+					) latest where grade in ('bad', 'almost')
+				))
 		) selected
-		where topic_number = 1
+		where topic_number = 1 or $4 <> 0
 		order by random()
 		limit $2
-	`, examKind, limit, semester)
+	`, examKind, limit, semester, topicID, difficulty, weakUserID)
 	if err != nil {
 		return nil, err
 	}
@@ -917,8 +1352,8 @@ func seed(ctx context.Context, db *pgxpool.Pool) error {
 		if err != nil {
 			return fmt.Errorf("quality: %w", err)
 		}
-		if err = seedCuratedContent(ctx, db); err != nil {
-			return fmt.Errorf("curated content: %w", err)
+		if err = seedCuratedCatalog(ctx, db); err != nil {
+			return fmt.Errorf("curated catalog: %w", err)
 		}
 		return nil
 	}
@@ -960,8 +1395,8 @@ func seed(ctx context.Context, db *pgxpool.Pool) error {
 	if err != nil {
 		return fmt.Errorf("quality: %w", err)
 	}
-	if err = seedCuratedContent(ctx, db); err != nil {
-		return fmt.Errorf("curated content: %w", err)
+	if err = seedCuratedCatalog(ctx, db); err != nil {
+		return fmt.Errorf("curated catalog: %w", err)
 	}
 	return nil
 }

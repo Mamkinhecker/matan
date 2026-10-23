@@ -5,15 +5,7 @@
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>{{.Title}}</title>
-	<script>
-		try {
-			if (localStorage.getItem("matan-design") !== "classic") {
-				document.documentElement.classList.add("design-new");
-			}
-		} catch (_) {
-			document.documentElement.classList.add("design-new");
-		}
-	</script>
+	<script>document.documentElement.classList.add("design-new");</script>
 	<link rel="stylesheet" href="/static/styles.css?v=3">
 	<script>window.MathJax = {tex: {inlineMath: [['\\(', '\\)'], ['$', '$']]}, svg: {fontCache: 'global'}};</script>
 	<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
@@ -32,10 +24,12 @@
 			<a class="{{if eq .Active "proof-game"}}active{{end}}" href="/proof-game">Доказательства</a>
 			<a class="{{if eq .Active "oral"}}active{{end}}" href="/oral">Устный</a>
 			<a class="{{if eq .Active "variant"}}active{{end}}" href="/variant">Вариант</a>
+			<a class="{{if eq .Active "practice"}}active{{end}}" href="/practice">Тренировка</a>
 			<a class="{{if eq .Active "theory-test"}}active{{end}}" href="/theory-test">Теория</a>
 			<a class="{{if eq .Active "ikr"}}active{{end}}" href="/ikr">ИКР</a>
 			<a class="{{if eq .Active "tkr"}}active{{end}}" href="/tkr">ТКР</a>
 			<a class="{{if eq .Active "progress"}}active{{end}}" href="/progress">Прогресс</a>
+			<a class="{{if eq .Active "review"}}active{{end}}" href="/review">Повторить сложное</a>
 			<a class="{{if eq .Active "leaderboard"}}active{{end}}" href="/leaderboard">Топ</a>
 			{{if .IsAdmin}}<a class="{{if eq .Active "admin"}}active{{end}}" href="/admin">Админка</a>{{end}}
 			{{if .CurrentUser}}
@@ -45,7 +39,6 @@
 			<a class="{{if eq .Active "auth"}}active{{end}}" href="/login">Войти</a>
 			<a href="/register">Регистрация</a>
 			{{end}}
-			<button class="design-toggle" type="button" data-design-toggle>Старый дизайн</button>
 		</nav>
 	</header>
 	<main class="shell">

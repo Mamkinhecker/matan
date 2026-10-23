@@ -1,0 +1,66 @@
+{{define "content"}}
+<div class="page-head">
+	<p class="eyebrow">Собери свой вариант</p>
+	<h1>Настроить тренировку</h1>
+	<p>Выбери разделы, сложность и количество заданий. Решения после выполнения остаются полными.</p>
+</div>
+<form class="practice-builder panel" method="get" action="/variant">
+	<label>Тип работы
+		<select name="kind">
+			<option value="">Смешанный вариант</option>
+			<option value="ikr">ИКР</option>
+			<option value="tkr">ТКР</option>
+			<option value="theory">Теория</option>
+		</select>
+	</label>
+	<label>Семестр
+		<select name="semester">
+			<option value="0">Все семестры</option>
+			<option value="1">1 семестр</option>
+			<option value="2">2 семестр</option>
+		</select>
+	</label>
+	<label>Тема
+		<select name="topic">
+			<option value="0">Все темы</option>
+			{{range .Topics}}<option value="{{.ID}}">{{.Title}}</option>{{end}}
+		</select>
+	</label>
+	<label>Сложность
+		<select name="difficulty">
+			<option value="0">Любая</option>
+			<option value="1">1 · базовая</option>
+			<option value="2">2 · базовая+</option>
+			<option value="3">3 · средняя</option>
+			<option value="4">4 · высокая</option>
+			<option value="5">5 · сложная</option>
+		</select>
+	</label>
+	<label>Заданий
+		<select name="count">
+			<option value="3">3</option>
+			<option value="6" selected>6</option>
+			<option value="10">10</option>
+			<option value="15">15</option>
+			<option value="20">20</option>
+		</select>
+	</label>
+	<label>Режим
+		<select name="exam">
+			<option value="0">Тренировка с решениями</option>
+			<option value="1">Экзамен с таймером</option>
+		</select>
+	</label>
+	<label>Время экзамена
+		<select name="minutes">
+			<option value="30">30 минут</option>
+			<option value="45" selected>45 минут</option>
+			<option value="60">60 минут</option>
+			<option value="90">90 минут</option>
+			<option value="120">120 минут</option>
+		</select>
+	</label>
+	<button class="button primary" type="submit">Сформировать вариант</button>
+</form>
+{{end}}
+{{template "layout" .}}

@@ -445,6 +445,7 @@ func initials(name string) string {
 func templateFunctions() template.FuncMap {
 	return template.FuncMap{
 		"add":      func(a, b int) int { return a + b },
+		"mul":      func(a, b int) int { return a * b },
 		"initials": initials,
 	}
 }

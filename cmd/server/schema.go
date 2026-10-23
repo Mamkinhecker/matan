@@ -88,6 +88,14 @@ create table if not exists attempts (
 	created_at timestamptz not null default now()
 );
 
+create table if not exists exam_runs (
+	id text primary key,
+	question_ids bigint[] not null,
+	expires_at timestamptz not null,
+	submitted_at timestamptz,
+	created_at timestamptz not null default now()
+);
+
 create table if not exists sessions (
 	token_hash text primary key,
 	user_id bigint not null references users(id) on delete cascade,
@@ -548,7 +556,10 @@ on conflict (text) do nothing;
 `
 
 const massTaskSQL = `
-delete from questions where theory_item_id in (select id from theory_items where title like 'Конспект:%') or text like '%Конспект:%' or text like '%типовую задачу по теме%';
+delete from questions q
+where (q.theory_item_id in (select id from theory_items where title like 'Конспект:%')
+	or q.text like '%Конспект:%' or q.text like '%типовую задачу по теме%')
+	and not exists (select 1 from attempts a where a.target_type = 'question' and a.target_id = q.id);
 update topics set semester = case
   when title in ('Функции двух переменных', 'Векторные функции и обратное отображение', 'Условный экстремум', 'Топология плоскости', 'Пределы и непрерывность функций двух переменных', 'Дифференцируемые функции двух переменных', 'Частные производные и дифференциалы высших порядков', 'Теорема о неявной функции', 'Определение и свойства двойного интеграла', 'Критерий Дарбу и аддитивность двойного интеграла', 'Сведение двойного интеграла к повторному', 'Замена переменных в двойном интеграле', 'Криволинейный интеграл первого типа', 'Криволинейный интеграл второго типа', 'Формула Грина', 'Условия независимости КРИ-2 от пути', 'Непрерывные и дифференцируемые векторные функции', 'Матрица Якоби сложной векторной функции', 'Дифференциалы высших порядков векторной функции', 'Кратные и тройные интегралы', 'Теорема о неявной векторной функции', 'Теорема об обратной векторной функции', 'Признаки независимости и зависимости системы функций', 'Локальные экстремумы функций векторного аргумента', 'Условный локальный экстремум', 'Метод Лагранжа', 'Глобальный экстремум функций векторного аргумента', 'Поверхности', 'Поверхностный интеграл первого типа', 'Поверхностный интеграл второго типа', 'Формула Остроградского') then 2 else 1 end;
 update topics set sort_order = coalesce(array_position(ARRAY[
@@ -612,7 +623,9 @@ on conflict (text) do nothing;
 `
 
 const qualitySQL = `
-delete from questions where text like '%Конспект:%' or text like '%типовую задачу по теме%';
+delete from questions q
+where (q.text like '%Конспект:%' or q.text like '%типовую задачу по теме%')
+	and not exists (select 1 from attempts a where a.target_type = 'question' and a.target_id = q.id);
 update proof_choice_games pg set correct_outline = ti.proof_full, explanation = ti.proof_full
 from theory_items ti where ti.id = pg.theory_item_id and ti.proof_full <> '';
 insert into proof_choice_games (theory_item_id, question, correct_outline, wrong_outline_1, wrong_outline_2, wrong_outline_3, explanation)
@@ -630,23 +643,26 @@ on conflict (question) do nothing;
 
 const repairSQL = `
 update questions q set text='Решить ИКР по теме «Неопределенный интеграл». Условие: вычислить integral (2x+1)*exp(x^2+x) dx заменой u=x^2+x. Вариант ' || q.id, expected_answer='Положим u=x^2+x, тогда du=(2x+1)dx. Получаем integral exp(u)du=exp(u)+C=exp(x^2+x)+C. Проверка дифференцированием возвращает (2x+1)exp(x^2+x).'
-from topics t where q.topic_id=t.id and t.title='Неопределенный интеграл' and q.exam_kind='ikr';
+from topics t where q.topic_id=t.id and t.title='Неопределенный интеграл' and q.exam_kind='ikr' and q.source='legacy';
 update questions q set text='Решить ИКР по теме «Правило Лопиталя». Условие: найти предел при x->0 выражения (exp(x)-1-x)/x^2. Вариант ' || q.id, expected_answer='Имеем форму 0/0. Дважды применяем правило Лопиталя: limit (exp(x)-1)/(2x)=limit exp(x)/2=1/2. Условия правила проверены в проколотой окрестности нуля.'
-from topics t where q.topic_id=t.id and t.title='Правило Лопиталя' and q.exam_kind='ikr';
+from topics t where q.topic_id=t.id and t.title='Правило Лопиталя' and q.exam_kind='ikr' and q.source='legacy';
 update questions q set text='Решить ИКР по теме «Формула Тейлора». Условие: разложить ln(1+x) при x->0 до степени x^3 с остатком Пеано. Вариант ' || q.id, expected_answer='Вычисляем f(0)=0, f2(0)=-1, f3(0)=2. По формуле Тейлора ln(1+x)=x-x^2/2+x^3/3+o(x^3). Остаток имеет требуемый порядок.'
-from topics t where q.topic_id=t.id and t.title='Формула Тейлора' and q.exam_kind='ikr';
+from topics t where q.topic_id=t.id and t.title='Формула Тейлора' and q.exam_kind='ikr' and q.source='legacy';
 update questions q set text='Решить ИКР по теме «Равномерная непрерывность и колебание функции». Условие: доказать равномерную непрерывность sqrt(x) на [0,+infinity) через epsilon-delta. Вариант ' || q.id, expected_answer='Для x,y>=0 имеем |sqrt(x)-sqrt(y)|<=sqrt(|x-y|). Пусть epsilon>0 и delta=epsilon^2. Из |x-y|<delta следует |f(x)-f(y)|<epsilon. Delta не зависит от x,y, поэтому функция равномерно непрерывна.'
-from topics t where q.topic_id=t.id and t.title='Равномерная непрерывность и колебание функции' and q.exam_kind='ikr';
+from topics t where q.topic_id=t.id and t.title='Равномерная непрерывность и колебание функции' and q.exam_kind='ikr' and q.source='legacy';
 update questions q set text='Решить ИКР по теме «Определенный интеграл». Условие: вычислить integral from 0 to 1 of (x^2+2x) dx по формуле Ньютона-Лейбница. Вариант ' || q.id, expected_answer='Подынтегральная функция непрерывна на [0,1]. I=[x^3/3+x^2]_0^1=1/3+1=4/3.'
-from topics t where q.topic_id=t.id and t.title='Определенный интеграл' and q.exam_kind='ikr';
+from topics t where q.topic_id=t.id and t.title='Определенный интеграл' and q.exam_kind='ikr' and q.source='legacy';
 update questions q set text='Решить ИКР по теме «Замена переменных в двойном интеграле». Условие: вычислить integral of (x^2+y^2) over disk x^2+y^2<=4 in polar coordinates. Вариант ' || q.id, expected_answer='x=r cos(phi), y=r sin(phi), dA=r dr dphi, 0<=r<=2, 0<=phi<=2pi. I=integral_0^{2pi} integral_0^2 r^3 dr dphi=8pi.'
-from topics t where q.topic_id=t.id and t.title='Замена переменных в двойном интеграле' and q.exam_kind='ikr';
+from topics t where q.topic_id=t.id and t.title='Замена переменных в двойном интеграле' and q.exam_kind='ikr' and q.source='legacy';
 update questions q set text='Решить ИКР по теме «Метод Лагранжа». Условие: найти максимум и минимум x+2y+2z на сфере x^2+y^2+z^2=9. Вариант ' || q.id, expected_answer='L=x+2y+2z-lambda(x^2+y^2+z^2-9). Система дает (x,y,z)=mu(1,2,2), mu=+-1. Значения равны 9 и -9, поэтому максимум 9, минимум -9.'
-from topics t where q.topic_id=t.id and t.title='Метод Лагранжа' and q.exam_kind='ikr';
+from topics t where q.topic_id=t.id and t.title='Метод Лагранжа' and q.exam_kind='ikr' and q.source='legacy';
 `
 
 const safeTaskSQL = `
-delete from questions where theory_item_id in (select id from theory_items where title like 'Конспект:%') or text like '%Конспект:%' or text like '%типовую задачу по теме%';
+delete from questions q
+where (q.theory_item_id in (select id from theory_items where title like 'Конспект:%')
+	or q.text like '%Конспект:%' or q.text like '%типовую задачу по теме%')
+	and not exists (select 1 from attempts a where a.target_type = 'question' and a.target_id = q.id);
 insert into questions (topic_id, theory_item_id, type, exam_kind, text, expected_answer, short_answer, difficulty, tags)
 select t.id, ti.id, v.type, v.exam_kind,
        v.prefix || ' по теме «' || t.title || '». Условие: ' || v.condition || ' Вариант ' || nums.n,
@@ -668,7 +684,10 @@ on conflict do nothing;
 `
 
 const auditedTaskSQL = `
-delete from questions where theory_item_id in (select id from theory_items where title like 'Конспект:%') or text like '%Конспект:%' or text like '%типовую задачу по теме%';
+delete from questions q
+where (q.theory_item_id in (select id from theory_items where title like 'Конспект:%')
+	or q.text like '%Конспект:%' or q.text like '%типовую задачу по теме%')
+	and not exists (select 1 from attempts a where a.target_type = 'question' and a.target_id = q.id);
 insert into questions (topic_id, theory_item_id, type, exam_kind, text, expected_answer, short_answer, difficulty, tags)
 select t.id, ti.id, v.type, v.exam_kind,
        v.prefix || ' по теме «' || t.title || '». Условие: ' ||

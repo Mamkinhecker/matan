@@ -1,26 +1,63 @@
 {{define "content"}}
 <div class="page-head">
-	<p class="eyebrow">Письменная работа</p>
+	<p class="eyebrow">{{if .IsReview}}Персональная практика{{else if .IsExam}}Экзаменационный режим{{else}}Письменная работа{{end}}</p>
 	<h1>{{.VariantTitle}}</h1>
-	<div class="actions"><a class="button" href="?semester=1">1 семестр</a><a class="button" href="?semester=2">2 семестр</a><a class="button" href="?semester=0">Все темы</a></div>
+	{{if .IsExam}}<div class="exam-clock" data-exam-timer="{{.ExamSecondsLeft}}" aria-live="polite">{{.ExamMinutes}}:00</div>{{end}}
+	{{if .ExamSubmitted}}
+	<p class="exam-score">Результат: <strong>{{.ExamScore}} / {{.ExamMaximum}}</strong> баллов. Автоматическая оценка ориентировочная; сверяйся с полным решением.</p>
+	{{else if not .IsReview}}
+	<div class="actions"><a class="button" href="/practice">Настроить вариант</a><a class="button" href="/variant?semester=1">1 семестр</a><a class="button" href="/variant?semester=2">2 семестр</a><a class="button" href="/variant?semester=0">Все темы</a></div>
+	{{end}}
 </div>
+{{if .IsExam}}
+{{if not .CurrentUser}}<p class="panel">Экзамен можно пройти без входа, но попытка сохранится в прогрессе только после авторизации.</p>{{end}}
+<form class="exam-form variant" method="post" action="/exam/submit" data-exam-form>
+	<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+	<input type="hidden" name="exam_run" value="{{.ExamRunID}}">
+	{{range .Questions}}
+	<section class="exam-question">
+		<span class="tag">{{.TopicTitle}} · {{.ExamKind}} · сложность {{.Difficulty}}</span>
+		<h2>{{.Text}}</h2>
+		<label for="answer-{{.ID}}">Решение</label>
+		<textarea id="answer-{{.ID}}" name="answer_{{.ID}}" rows="8" placeholder="Запиши полное решение с обоснованием каждого шага."></textarea>
+		<input type="hidden" name="question_id" value="{{.ID}}">
+	</section>
+	{{end}}
+	<button class="button primary exam-submit" type="submit">Завершить экзамен</button>
+</form>
+{{else if .ExamSubmitted}}
+<section class="variant exam-results">
+	{{range .Questions}}
+	<article class="exam-question">
+		<span class="tag">{{.TopicTitle}} · {{.ExamKind}}</span>
+		<h2>{{.Text}}</h2>
+		<h3>Твой ответ</h3>
+		<p>{{if .StudentAnswer}}{{.StudentAnswer}}{{else}}Ответ не дан.{{end}}</p>
+		<p class="exam-feedback">{{.Feedback}}</p>
+		<details class="solution" open><summary>Полное строгое решение</summary><p>{{.ExpectedAnswer}}</p></details>
+	</article>
+	{{end}}
+	<a class="button primary" href="/practice">Новая тренировка</a>
+</section>
+{{else}}
 <section class="variant">
 	<ol>
 		{{range .Questions}}
 		<li>
-			<span class="tag">{{.TopicTitle}} · {{.ExamKind}} · {{.Type}}</span>
+			<span class="tag">{{.TopicTitle}} · {{.ExamKind}} · {{.Type}} · сложность {{.Difficulty}}</span>
 			<p>{{.Text}}</p>
 			<form class="answer-form" method="post" action="/attempts">
 				<input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
 				<input type="hidden" name="target_type" value="question">
 				<input type="hidden" name="target_id" value="{{.ID}}">
 				<input type="hidden" name="mode" value="variant">
-				<input type="hidden" name="redirect" value="{{if eq .ExamKind "ikr"}}/ikr{{else if eq .ExamKind "tkr"}}/tkr{{else}}/theory-test{{end}}">
-				<textarea name="student_answer" rows="4" placeholder="Напиши решение или доказательство. Валидатор проверит обязательные смысловые шаги."></textarea>
+				<input type="hidden" name="redirect" value="{{$.ReturnURL}}">
+				<label for="student-answer-{{.ID}}">Твой ответ</label>
+				<textarea id="student-answer-{{.ID}}" name="student_answer" rows="4" placeholder="Напиши решение или доказательство. Автооценка ориентировочная."></textarea>
 				<button class="button primary" name="grade" value="good">Проверить ответ</button>
 			</form>
 			<details class="solution">
-				<summary>Полное решение</summary>
+				<summary>Полное строгое решение</summary>
 				<p>{{.ExpectedAnswer}}</p>
 			</details>
 			<form class="grade-row" method="post" action="/attempts">
@@ -28,19 +65,19 @@
 				<input type="hidden" name="target_type" value="question">
 				<input type="hidden" name="target_id" value="{{.ID}}">
 				<input type="hidden" name="mode" value="variant">
-				<input type="hidden" name="redirect" value="{{if eq .ExamKind "ikr"}}/ikr{{else if eq .ExamKind "tkr"}}/tkr{{else}}/theory-test{{end}}">
+				<input type="hidden" name="redirect" value="{{$.ReturnURL}}">
 				<button name="grade" value="bad">Не решил</button>
 				<button name="grade" value="almost">Почти</button>
 				<button name="grade" value="good">Решил</button>
 				<button name="grade" value="perfect">Идеально</button>
 			</form>
 		</li>
+		{{else}}
+		<li>Пока нет заданий для этого набора. Измени фильтры или попробуй другую тему.</li>
 		{{end}}
 	</ol>
-	<a class="button primary" href="/variant?semester=1">Смешанный вариант</a>
-	<a class="button" href="/theory-test?semester=1">Теория</a>
-	<a class="button" href="/ikr?semester=1">ИКР</a>
-	<a class="button" href="/tkr?semester=1">ТКР</a>
+	{{if .IsReview}}<a class="button" href="/progress">К прогрессу</a>{{else}}<a class="button primary" href="/practice">Настроить вариант</a>{{end}}
 </section>
+{{end}}
 {{end}}
 {{template "layout" .}}
