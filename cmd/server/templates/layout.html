@@ -5,13 +5,22 @@
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>{{.Title}}</title>
-	<link rel="stylesheet" href="/static/styles.css?v=2">
+	<script>
+		try {
+			if (localStorage.getItem("matan-design") !== "classic") {
+				document.documentElement.classList.add("design-new");
+			}
+		} catch (_) {
+			document.documentElement.classList.add("design-new");
+		}
+	</script>
+	<link rel="stylesheet" href="/static/styles.css?v=3">
 	<script>window.MathJax = {tex: {inlineMath: [['\\(', '\\)'], ['$', '$']]}, svg: {fontCache: 'global'}};</script>
 	<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
 </head>
 <body>
 	<header class="topbar">
-		<a class="brand" href="/">Matan Trainer</a>
+		<a class="brand" href="/">Matan FAMCS</a>
 		<button class="menu-toggle" type="button" aria-label="Открыть меню" aria-controls="site-nav" aria-expanded="false">
 			<span></span><span></span><span></span>
 		</button>
@@ -36,12 +45,13 @@
 			<a class="{{if eq .Active "auth"}}active{{end}}" href="/login">Войти</a>
 			<a href="/register">Регистрация</a>
 			{{end}}
+			<button class="design-toggle" type="button" data-design-toggle>Старый дизайн</button>
 		</nav>
 	</header>
 	<main class="shell">
 		{{template "content" .}}
 	</main>
-	<script src="/static/app.js"></script>
+	<script src="/static/app.js?v=3"></script>
 </body>
 </html>
 {{end}}

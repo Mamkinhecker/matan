@@ -71,3 +71,24 @@ if (menuToggle && siteNav && navBackdrop) {
 	mobileMenu.addEventListener("change", () => setMenuOpen(false));
 	setMenuOpen(false);
 }
+
+const designToggle = document.querySelector("[data-design-toggle]");
+if (designToggle) {
+	const updateDesignLabel = () => {
+		const isNewDesign = document.documentElement.classList.contains("design-new");
+		designToggle.textContent = isNewDesign ? "Старый дизайн" : "Новый дизайн";
+		designToggle.setAttribute("aria-pressed", String(!isNewDesign));
+	};
+
+	designToggle.addEventListener("click", () => {
+		const useNewDesign = !document.documentElement.classList.contains("design-new");
+		document.documentElement.classList.toggle("design-new", useNewDesign);
+		try {
+			localStorage.setItem("matan-design", useNewDesign ? "new" : "classic");
+		} catch (_) {
+			// The selection still applies for this page if storage is unavailable.
+		}
+		updateDesignLabel();
+	});
+	updateDesignLabel();
+}

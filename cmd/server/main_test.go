@@ -263,3 +263,26 @@ func TestCardsPageRendersGroupedCardsWithCSRFToken(t *testing.T) {
 		t.Errorf("cards page has %d CSRF fields, want 1", got)
 	}
 }
+
+func TestHomeUsesNewBrandWithoutIntroductoryProjectCopy(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest("GET", "/", nil)
+	(&App{}).render(recorder, request, "home.html", PageData{
+		Title: "Matan FAMCS",
+		Stats: map[string]int{},
+	})
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("render status = %d: %s", recorder.Code, recorder.Body.String())
+	}
+	body := recorder.Body.String()
+	for _, expected := range []string{"Matan FAMCS", "Старый дизайн", "design-new"} {
+		if !strings.Contains(body, expected) {
+			t.Errorf("home page does not contain %q", expected)
+		}
+	}
+	for _, removed := range []string{"PostgreSQL · личный прогресс и рейтинг", "Тренажер под реальные письменные варианты"} {
+		if strings.Contains(body, removed) {
+			t.Errorf("home page still contains removed project intro %q", removed)
+		}
+	}
+}

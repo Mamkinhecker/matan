@@ -222,7 +222,7 @@ func main() {
 		port = ":" + port
 	}
 	addr := port
-	log.Printf("matan trainer listening on http://localhost%s", addr)
+	log.Printf("Matan FAMCS listening on http://localhost%s", addr)
 	log.Fatal(http.ListenAndServe(addr, app.authenticate(mux)))
 }
 
@@ -253,7 +253,7 @@ func (a *App) home(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	a.render(w, r, "home.html", PageData{Title: "Matan Trainer", Active: "home", Stats: stats})
+	a.render(w, r, "home.html", PageData{Title: "Matan FAMCS", Active: "home", Stats: stats})
 }
 
 func (a *App) topics(w http.ResponseWriter, r *http.Request) {
