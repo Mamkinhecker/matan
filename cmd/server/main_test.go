@@ -367,6 +367,25 @@ func TestHomeUsesNewBrandWithoutIntroductoryProjectCopy(t *testing.T) {
 	}
 }
 
+func TestAnonymousNavigationStartsWithAuthLinksAndThemeToggle(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest("GET", "/", nil)
+	(&App{}).render(recorder, request, "home.html", PageData{Title: "Matan FAMCS"})
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("render status = %d: %s", recorder.Code, recorder.Body.String())
+	}
+	body := recorder.Body.String()
+	login := strings.Index(body, `href="/login">Войти</a>`)
+	register := strings.Index(body, `href="/register">Регистрация</a>`)
+	topics := strings.Index(body, `href="/topics">Темы</a>`)
+	if login < 0 || register < 0 || topics < 0 || login > register || register > topics {
+		t.Fatalf("anonymous navigation does not start with login and registration links: login=%d register=%d topics=%d", login, register, topics)
+	}
+	if !strings.Contains(body, `data-theme-toggle`) {
+		t.Error("navigation is missing the theme toggle")
+	}
+}
+
 func TestCuratedExtraTasksHaveCompleteSolutions(t *testing.T) {
 	if len(curatedExtraTasks) != 30 {
 		t.Fatalf("curated extra task count = %d, want 30", len(curatedExtraTasks))

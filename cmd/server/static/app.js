@@ -66,6 +66,24 @@ const menuToggle = document.querySelector(".menu-toggle");
 const siteNav = document.querySelector("#site-nav");
 const navBackdrop = document.querySelector(".nav-backdrop");
 
+const themeToggle = document.querySelector("[data-theme-toggle]");
+if (themeToggle) {
+	const isDark = document.documentElement.dataset.theme === "dark";
+	themeToggle.setAttribute("aria-pressed", String(isDark));
+	themeToggle.textContent = isDark ? "Светлая тема" : "Тёмная тема";
+	themeToggle.addEventListener("click", () => {
+		const enableDark = document.documentElement.dataset.theme !== "dark";
+		if (enableDark) {
+			document.documentElement.dataset.theme = "dark";
+		} else {
+			delete document.documentElement.dataset.theme;
+		}
+		localStorage.setItem("theme", enableDark ? "dark" : "light");
+		themeToggle.setAttribute("aria-pressed", String(enableDark));
+		themeToggle.textContent = enableDark ? "Светлая тема" : "Тёмная тема";
+	});
+}
+
 if (menuToggle && siteNav && navBackdrop) {
 	const mobileMenu = window.matchMedia("(max-width: 760px)");
 	const setMenuOpen = (open) => {

@@ -1293,3 +1293,85 @@ th {
 		transition-duration: 0.01ms !important;
 	}
 }
+
+.design-new[data-theme="dark"] {
+	color-scheme: dark;
+	--bg: #171923;
+	--paper: #232632;
+	--ink: #ececf2;
+	--muted: #a8adbc;
+	--line: #424758;
+	--green: #b9d9d4;
+	--red: #ff8a83;
+	--blue: #9bc9ff;
+	--soft-green: #303a3c;
+	--soft-red: #452b2d;
+	--yellow: #e6c989;
+	--yellow-soft: #34313a;
+	--shadow: 4px 4px 0 #08090d;
+}
+
+.design-new[data-theme="dark"] body {
+	background-image: radial-gradient(#343847 1px, transparent 1px);
+}
+
+.design-new[data-theme="dark"] .brand::before {
+	background: #493b35;
+}
+
+.design-new[data-theme="dark"] .intro::after {
+	background: #493b35;
+}
+
+.design-new[data-theme="dark"] .button.primary,
+.design-new[data-theme="dark"] button.primary {
+	background: #493b35;
+}
+
+.design-new[data-theme="dark"] .button.primary:hover,
+.design-new[data-theme="dark"] button.primary:hover {
+	background: #5a4840;
+}
+
+.design-new[data-theme="dark"] .mode-grid a:nth-child(4n + 2) {
+	background: #342d2b;
+}
+
+.design-new[data-theme="dark"] .mode-grid a:nth-child(4n + 3),
+.design-new[data-theme="dark"] .card-topic-group > h3 {
+	background: #293638;
+}
+
+.design-new[data-theme="dark"] .eyebrow,
+.design-new[data-theme="dark"] .tag {
+	color: #e2a98f;
+}
+
+.design-new[data-theme="dark"] input:focus,
+.design-new[data-theme="dark"] select:focus,
+.design-new[data-theme="dark"] textarea:focus {
+	outline-color: rgb(185 217 212 / 35%);
+}
+
+.design-new[data-theme="dark"] .leaderboard-table tbody tr:hover {
+	background: #342d2b;
+}
+
+.design-new[data-theme="dark"] .leader-avatar {
+	background: #293638;
+}
+
+.design-new[data-theme="dark"] .leader-points {
+	color: #e2a98f;
+}
+
+@media (max-width: 760px) {
+	.design-new[data-theme="dark"] .menu-toggle {
+		background: #493b35;
+	}
+
+	.design-new[data-theme="dark"] .nav a:hover,
+	.design-new[data-theme="dark"] .nav a.active {
+		background: var(--soft-green);
+	}
+}
