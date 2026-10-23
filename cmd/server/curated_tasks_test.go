@@ -19,7 +19,7 @@ func TestCuratedTaskCatalogCoverage(t *testing.T) {
 		}
 		for field, value := range map[string]string{
 			"IKR condition": spec.IKR,
-			"IKR answer":   spec.IKRAnswer,
+			"IKR answer":    spec.IKRAnswer,
 			"TKR statement": spec.TKR,
 			"TKR answer":    spec.TKRAnswer,
 		} {

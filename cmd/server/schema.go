@@ -79,6 +79,9 @@ create table if not exists attempts (
 	demo_student_id bigint not null default 1,
 	target_type text not null check (target_type in ('card', 'question', 'proof_game')),
 	target_id bigint not null,
+	target_card_id bigint,
+	target_question_id bigint,
+	target_proof_game_id bigint,
 	mode text not null check (mode in ('cards', 'formulations', 'proof_game', 'oral', 'variant')),
 	grade text not null check (grade in ('bad', 'almost', 'good', 'perfect')),
 	notes text not null default '',
@@ -87,6 +90,10 @@ create table if not exists attempts (
 	points int not null default 0,
 	created_at timestamptz not null default now()
 );
+
+alter table attempts add column if not exists target_card_id bigint;
+alter table attempts add column if not exists target_question_id bigint;
+alter table attempts add column if not exists target_proof_game_id bigint;
 
 create table if not exists exam_runs (
 	id text primary key,
@@ -126,6 +133,80 @@ begin
 	end if;
 end;
 $$;
+
+update attempts a
+set target_card_id = c.id
+from cards c
+where a.target_type = 'card' and a.target_id = c.id and a.target_card_id is null;
+update attempts a
+set target_question_id = q.id
+from questions q
+where a.target_type = 'question' and a.target_id = q.id and a.target_question_id is null;
+update attempts a
+set target_proof_game_id = g.id
+from proof_choice_games g
+where a.target_type = 'proof_game' and a.target_id = g.id and a.target_proof_game_id is null;
+
+do $$
+begin
+	if not exists (select 1 from pg_constraint where conname = 'attempts_target_card_id_fkey' and conrelid = 'attempts'::regclass) then
+		alter table attempts add constraint attempts_target_card_id_fkey
+			foreign key (target_card_id) references cards(id) on delete restrict;
+	end if;
+	if not exists (select 1 from pg_constraint where conname = 'attempts_target_question_id_fkey' and conrelid = 'attempts'::regclass) then
+		alter table attempts add constraint attempts_target_question_id_fkey
+			foreign key (target_question_id) references questions(id) on delete restrict;
+	end if;
+	if not exists (select 1 from pg_constraint where conname = 'attempts_target_proof_game_id_fkey' and conrelid = 'attempts'::regclass) then
+		alter table attempts add constraint attempts_target_proof_game_id_fkey
+			foreign key (target_proof_game_id) references proof_choice_games(id) on delete restrict;
+	end if;
+end;
+$$;
+
+do $$
+begin
+	if not exists (select 1 from pg_constraint where conname = 'attempts_target_reference_matches_type_check' and conrelid = 'attempts'::regclass) then
+		alter table attempts add constraint attempts_target_reference_matches_type_check
+			check (
+				(target_card_id is null or (target_type = 'card' and target_card_id = target_id))
+				and (target_question_id is null or (target_type = 'question' and target_question_id = target_id))
+				and (target_proof_game_id is null or (target_type = 'proof_game' and target_proof_game_id = target_id))
+			);
+	end if;
+end;
+$$;
+
+create or replace function set_attempt_target_reference() returns trigger
+language plpgsql
+as $$
+begin
+	if tg_op = 'UPDATE' and new.target_type = old.target_type and new.target_id = old.target_id then
+		return new;
+	end if;
+	new.target_card_id := null;
+	new.target_question_id := null;
+	new.target_proof_game_id := null;
+	case new.target_type
+		when 'card' then
+			select id into new.target_card_id from cards where id = new.target_id;
+		when 'question' then
+			select id into new.target_question_id from questions where id = new.target_id;
+		when 'proof_game' then
+			select id into new.target_proof_game_id from proof_choice_games where id = new.target_id;
+	end case;
+	if new.target_card_id is null and new.target_question_id is null and new.target_proof_game_id is null then
+		raise exception 'attempt target %:% does not exist', new.target_type, new.target_id
+			using errcode = 'foreign_key_violation';
+	end if;
+	return new;
+end;
+$$;
+
+drop trigger if exists attempts_set_target_reference on attempts;
+create trigger attempts_set_target_reference
+	before insert or update on attempts
+	for each row execute function set_attempt_target_reference();
 
 create index if not exists idx_theory_items_topic_id on theory_items(topic_id);
 create index if not exists idx_cards_topic_id on cards(topic_id);

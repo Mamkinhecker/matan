@@ -1,0 +1,148 @@
+name: Go CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: matan_trainer
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d matan_trainer"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Check formatting
+        run: test -z "$(gofmt -l ./cmd)"
+
+      - name: Test
+        run: go test -race -count=1 ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Build
+        run: go build -o /tmp/matan-trainer ./cmd/server
+
+      - name: Smoke test with PostgreSQL
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/matan_trainer?sslmode=disable
+          PORT: "18080"
+        run: |
+          set -euo pipefail
+          /tmp/matan-trainer > /tmp/matan-trainer.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true; wait "$server_pid" 2>/dev/null || true' EXIT
+
+          ready=false
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:18080/ >/dev/null; then
+              ready=true
+              break
+            fi
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              cat /tmp/matan-trainer.log
+              exit 1
+            fi
+            sleep 1
+          done
+          if [ "$ready" != true ]; then
+            cat /tmp/matan-trainer.log
+            exit 1
+          fi
+
+          for path in /topics /practice /cards /formulations /proof-game /oral /variant /ikr /tkr /theory-test /login /register; do
+            curl --fail --silent --show-error "http://127.0.0.1:18080$path" >/dev/null
+          done
+
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          do $$
+          begin
+            if (select count(*) from topics) <> 84 then
+              raise exception 'expected 84 course topics';
+            end if;
+            if (select count(*) from questions where source = 'curated' and tags @> array['curated-second']::text[]) <> 336 then
+              raise exception 'expected 336 additional curated tasks';
+            end if;
+            if exists (
+              select 1
+              from topics t
+              where (select count(*) from questions q where q.topic_id = t.id and q.source = 'curated' and q.exam_kind = 'ikr' and q.tags @> array['curated-second']::text[]) <> 2
+                 or (select count(*) from questions q where q.topic_id = t.id and q.source = 'curated' and q.exam_kind = 'tkr' and q.tags @> array['curated-second']::text[]) <> 2
+            ) then
+              raise exception 'a topic does not have exactly two additional IKR and TKR tasks';
+            end if;
+          end;
+          $$;
+
+          do $$
+          declare
+            target_kind text;
+            rejected boolean;
+          begin
+            foreach target_kind in array array['card', 'question', 'proof_game'] loop
+              rejected := false;
+              begin
+                insert into attempts (target_type, target_id, mode, grade)
+                values (target_kind, 9223372036854775807, 'cards', 'bad');
+              exception when foreign_key_violation then
+                rejected := true;
+              end;
+              if not rejected then
+                raise exception 'attempt with missing % target was accepted', target_kind;
+              end if;
+            end loop;
+          end;
+          $$;
+
+          begin;
+          insert into attempts (target_type, target_id, mode, grade)
+            select 'card', id, 'cards', 'bad' from cards order by id limit 1;
+          insert into attempts (target_type, target_id, mode, grade)
+            select 'question', id, 'variant', 'bad' from questions order by id limit 1;
+          insert into attempts (target_type, target_id, mode, grade)
+            select 'proof_game', id, 'proof_game', 'bad' from proof_choice_games order by id limit 1;
+          DO $$
+          BEGIN
+            BEGIN
+              DELETE FROM cards WHERE id = (SELECT target_card_id FROM attempts WHERE target_card_id IS NOT NULL ORDER BY id DESC LIMIT 1);
+              RAISE EXCEPTION 'deletion of a referenced card unexpectedly succeeded';
+            EXCEPTION WHEN foreign_key_violation THEN
+              NULL;
+            END;
+            BEGIN
+              DELETE FROM questions WHERE id = (SELECT target_question_id FROM attempts WHERE target_question_id IS NOT NULL ORDER BY id DESC LIMIT 1);
+              RAISE EXCEPTION 'deletion of a referenced question unexpectedly succeeded';
+            EXCEPTION WHEN foreign_key_violation THEN
+              NULL;
+            END;
+            BEGIN
+              DELETE FROM proof_choice_games WHERE id = (SELECT target_proof_game_id FROM attempts WHERE target_proof_game_id IS NOT NULL ORDER BY id DESC LIMIT 1);
+              RAISE EXCEPTION 'deletion of a referenced proof game unexpectedly succeeded';
+            EXCEPTION WHEN foreign_key_violation THEN
+              NULL;
+            END;
+          END;
+          $$;
+          rollback;
+          SQL
