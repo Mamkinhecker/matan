@@ -1056,6 +1056,7 @@ func curatedSecondTasks() []curatedSecondTask {
 			)
 		}
 	}
+	tasks = append(tasks, curatedFifthTasks()...)
 	return tasks
 }
 
@@ -1123,11 +1124,28 @@ func validateCuratedSecondTaskCatalog() error {
 			return fmt.Errorf("third authored pair has unexpected topic %q", topic)
 		}
 	}
+	if len(curatedFifthTaskSpecs) != 69 {
+		return fmt.Errorf("fifth authored pair catalog has %d topics; expected 69", len(curatedFifthTaskSpecs))
+	}
+	fifthTopics := make(map[string]bool, len(curatedFifthTaskSpecs))
+	for _, entry := range curatedFifthTaskSpecs {
+		if !knownTopics[entry.topic] {
+			return fmt.Errorf("fifth authored pair has unknown topic %q", entry.topic)
+		}
+		if fifthTopics[entry.topic] {
+			return fmt.Errorf("fifth authored pair repeats topic %q", entry.topic)
+		}
+		fifthTopics[entry.topic] = true
+		if entry.spec.IKR == "" || entry.spec.IKRAnswer == "" || entry.spec.TKR == "" || entry.spec.TKRAnswer == "" {
+			return fmt.Errorf("fifth authored pair is incomplete for topic %q", entry.topic)
+		}
+	}
 	tasks := curatedSecondTasks()
-	if len(tasks) != 336 {
-		return fmt.Errorf("authored task count is %d; expected 336", len(tasks))
+	if len(tasks) != 474 {
+		return fmt.Errorf("authored task count is %d; expected 474", len(tasks))
 	}
 	taskCounts := make(map[string]map[string]int, len(courseTopicOrder))
+	kindCounts := make(map[string]int)
 	seen := make(map[string]string)
 	for _, task := range tasks {
 		minAnswerLength := 80
@@ -1150,8 +1168,9 @@ func validateCuratedSecondTaskCatalog() error {
 			taskCounts[task.topic] = make(map[string]int)
 		}
 		taskCounts[task.topic][task.kind]++
+		kindCounts[task.kind]++
 		if prior, ok := seen[task.text]; ok {
-			return fmt.Errorf("duplicate authored question text in %s and %s", prior, task.topic)
+			return fmt.Errorf("duplicate authored question text in %s and %s: %s", prior, task.topic, task.text)
 		}
 		seen[task.text] = task.topic
 		if base, _ := curatedSpecFor(task.topic); task.text == base.IKR || task.text == base.TKR {
@@ -1159,10 +1178,25 @@ func validateCuratedSecondTaskCatalog() error {
 		}
 	}
 	for _, topic := range courseTopicOrder {
-		if taskCounts[topic]["ikr"] != 2 || taskCounts[topic]["tkr"] != 2 {
-			return fmt.Errorf("authored tasks for %q have IKR/TKR counts %d/%d; expected 2/2",
-				topic, taskCounts[topic]["ikr"], taskCounts[topic]["tkr"])
+		want := 2
+		if fifthTopics[topic] {
+			want++
 		}
+		if taskCounts[topic]["ikr"] != want || taskCounts[topic]["tkr"] != want {
+			return fmt.Errorf("authored tasks for %q have IKR/TKR counts %d/%d; expected %d/%d",
+				topic, taskCounts[topic]["ikr"], taskCounts[topic]["tkr"], want, want)
+		}
+	}
+	if kindCounts["ikr"] != 237 || kindCounts["tkr"] != 237 {
+		return fmt.Errorf("authored IKR/TKR counts are %d/%d; expected 237/237", kindCounts["ikr"], kindCounts["tkr"])
+	}
+	baseCounts := map[string]int{"ikr": len(courseTopicOrder), "tkr": len(courseTopicOrder)}
+	for _, task := range curatedExtraTasks {
+		baseCounts[task.kind]++
+	}
+	if baseCounts["ikr"]+kindCounts["ikr"] != 336 || baseCounts["tkr"]+kindCounts["tkr"] != 336 {
+		return fmt.Errorf("total IKR/TKR counts would be %d/%d; expected 336/336",
+			baseCounts["ikr"]+kindCounts["ikr"], baseCounts["tkr"]+kindCounts["tkr"])
 	}
 	for _, task := range curatedExtraTasks {
 		if _, ok := seen[task.text]; ok {
