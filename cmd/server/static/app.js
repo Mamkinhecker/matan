@@ -70,7 +70,13 @@ const themeToggle = document.querySelector("[data-theme-toggle]");
 if (themeToggle) {
 	const isDark = document.documentElement.dataset.theme === "dark";
 	themeToggle.setAttribute("aria-pressed", String(isDark));
-	themeToggle.textContent = isDark ? "Светлая тема" : "Тёмная тема";
+	const updateThemeToggle = (dark) => {
+		const nextTheme = dark ? "светлую" : "тёмную";
+		themeToggle.setAttribute("aria-label", `Включить ${nextTheme} тему`);
+		themeToggle.querySelector(".theme-toggle-label").textContent = dark ? "Светлая тема" : "Тёмная тема";
+		themeToggle.querySelector(".theme-toggle-icon").textContent = dark ? "☼" : "◐";
+	};
+	updateThemeToggle(isDark);
 	themeToggle.addEventListener("click", () => {
 		const enableDark = document.documentElement.dataset.theme !== "dark";
 		if (enableDark) {
@@ -80,7 +86,7 @@ if (themeToggle) {
 		}
 		localStorage.setItem("theme", enableDark ? "dark" : "light");
 		themeToggle.setAttribute("aria-pressed", String(enableDark));
-		themeToggle.textContent = enableDark ? "Светлая тема" : "Тёмная тема";
+		updateThemeToggle(enableDark);
 	});
 }
 

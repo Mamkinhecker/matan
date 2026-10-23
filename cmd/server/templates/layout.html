@@ -18,9 +18,15 @@
 <body>
 	<header class="topbar">
 		<a class="brand" href="/">Matan FAMCS</a>
-		<button class="menu-toggle" type="button" aria-label="Открыть меню" aria-controls="site-nav" aria-expanded="false">
-			<span></span><span></span><span></span>
-		</button>
+		<div class="topbar-actions">
+			<button class="design-toggle" type="button" data-theme-toggle aria-pressed="false" aria-label="Включить тёмную тему">
+				<span class="theme-toggle-icon" aria-hidden="true">◐</span>
+				<span class="theme-toggle-label">Тёмная тема</span>
+			</button>
+			<button class="menu-toggle" type="button" aria-label="Открыть меню" aria-controls="site-nav" aria-expanded="false">
+				<span></span><span></span><span></span>
+			</button>
+		</div>
 		<button class="nav-backdrop" type="button" aria-label="Закрыть меню" tabindex="-1"></button>
 		<nav class="nav" id="site-nav">
 			{{if not .CurrentUser}}
@@ -45,7 +51,6 @@
 			<span class="nav-user">{{.CurrentUser}}</span>
 			<form class="nav-logout" method="post" action="/logout"><input type="hidden" name="csrf_token" value="{{.CSRFToken}}"><button type="submit">Выйти</button></form>
 			{{end}}
-			<button class="design-toggle" type="button" data-theme-toggle aria-pressed="false">Тёмная тема</button>
 		</nav>
 	</header>
 	<main class="shell">

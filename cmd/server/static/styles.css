@@ -890,6 +890,13 @@ th {
 	gap: 4px;
 }
 
+.design-new .topbar-actions {
+	display: flex;
+	flex: 0 0 auto;
+	align-items: center;
+	gap: 10px;
+}
+
 .design-new .nav a {
 	border-radius: 9px;
 	color: var(--muted);
@@ -919,11 +926,18 @@ th {
 
 .design-new .design-toggle {
 	flex: 0 0 auto;
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
 	border: 2px solid var(--ink);
 	border-radius: 9px;
 	background: var(--paper);
 	box-shadow: 2px 2px 0 var(--ink);
 	font-size: 13px;
+}
+
+.design-new .theme-toggle-icon {
+	font: 700 19px/1 ui-sans-serif, system-ui, sans-serif;
 }
 
 .design-new .design-toggle:hover {
@@ -1179,7 +1193,9 @@ th {
 	.design-new .topbar {
 		align-items: center;
 		flex-direction: row;
+		flex-wrap: nowrap;
 		justify-content: space-between;
+		gap: 12px;
 		padding: 10px 16px;
 	}
 
@@ -1228,8 +1244,19 @@ th {
 		background: rgb(23 27 41 / 48%);
 	}
 
+	.design-new .topbar-actions {
+		gap: 8px;
+	}
+
 	.design-new .design-toggle {
-		align-self: stretch;
+		width: 42px;
+		height: 42px;
+		justify-content: center;
+		padding: 0;
+	}
+
+	.design-new .theme-toggle-label {
+		display: none;
 	}
 
 	.design-new .shell {
@@ -1366,6 +1393,10 @@ th {
 }
 
 @media (max-width: 760px) {
+	.design-new[data-theme="dark"] .design-toggle {
+		background: var(--paper);
+	}
+
 	.design-new[data-theme="dark"] .menu-toggle {
 		background: #493b35;
 	}

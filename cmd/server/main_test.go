@@ -382,7 +382,10 @@ func TestAnonymousNavigationStartsWithAuthLinksAndThemeToggle(t *testing.T) {
 		t.Fatalf("anonymous navigation does not start with login and registration links: login=%d register=%d topics=%d", login, register, topics)
 	}
 	if !strings.Contains(body, `data-theme-toggle`) {
-		t.Error("navigation is missing the theme toggle")
+		t.Error("header is missing the theme toggle")
+	}
+	if navStart, themeToggle := strings.Index(body, `<nav class="nav"`), strings.Index(body, `data-theme-toggle`); navStart < 0 || themeToggle > navStart {
+		t.Error("theme toggle should sit outside and before the primary navigation")
 	}
 }
 
